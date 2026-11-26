@@ -20,7 +20,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {ExtensionState} from 'resource:///org/gnome/shell/misc/extensionUtils.js';
 
 import {Dock, END_MARGIN} from '../dock.js';
-import {geometryAt, showAppsSymbolMargin} from '../geometry.js';
+import {dockSizeAt, geometryAt, showAppsSymbolMargin} from '../geometry.js';
 import {MinimizeTarget} from '../minimizeTarget.js';
 import {OverviewSideRoom} from '../overviewRoom.js';
 import {StockDashTakeover} from '../stockDash.js';
@@ -1219,9 +1219,10 @@ async function testReducedMotion(window) {
             },
         };
         dash.setGrowLimit(() => {
-            const sizes = dash._dockSizes();
+            const measurements = dash._dockMeasurements();
             const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
-            return (sizes.backgroundThickness(cap) - sizes.backgroundThickness(target)) * scaleFactor;
+            const thicknessAt = size => dockSizeAt(measurements, size).backgroundThickness;
+            return (thicknessAt(cap) - thicknessAt(target)) * scaleFactor;
         });
         dash._applyIconSizeSetting();
         check('resize: a rejected settings write still applies the cap',

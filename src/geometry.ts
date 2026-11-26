@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Tobias Eichert
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-/** Default icon size and reference for the dock's proportions. */
-const REFERENCE_SIZE = 48;
+// Logical pixels. Keep the range and default in sync with the GSettings schema.
+export const MIN_ICON_SIZE = 16;
+export const MAX_ICON_SIZE = 64;
+export const DEFAULT_ICON_SIZE = 48;
 
 /**
- * Spacing and corner radii at REFERENCE_SIZE, in logical pixels. geometryAt()
+ * Spacing and corner radii at DEFAULT_ICON_SIZE, in logical pixels. geometryAt()
  * scales these values with the icon size. The stylesheet controls the fixed
  * screen-edge gap and borders. The letters below match the geometry rules in
  * its header.
@@ -41,7 +43,7 @@ export type Geometry = typeof REFERENCE & {
 };
 
 /**
- * Scale the geometry from REFERENCE_SIZE and return whole logical pixels.
+ * Scale the geometry from DEFAULT_ICON_SIZE and return whole logical pixels.
  * Round two totals before solving for G and P from the rounded S and T.
  * Those totals are the extra length around each item (2S + 2T + G) and the
  * end padding (P - S). This avoids jumps when several individual lengths
@@ -51,7 +53,7 @@ export type Geometry = typeof REFERENCE & {
  * and its gap to the tile.
  */
 export function geometryAt(size: number): Geometry {
-    const scale = size / REFERENCE_SIZE;
+    const scale = size / DEFAULT_ICON_SIZE;
     const px = (value: number, min = 1) => Math.max(min, Math.round(value * scale));
     const {itemMargin: S, tilePadding: T, iconGrow: G, backgroundPadding: P} = REFERENCE;
     const itemMargin = px(S);
@@ -83,8 +85,7 @@ export function geometryAt(size: number): Geometry {
  * approximates the reference ratio of 7/9, or a 42px symbol beside a 54px app
  * icon.
  */
-export function showAppsPadding(size: number): number {
-    const {footprint, iconGrow} = geometryAt(size);
+export function showAppsPadding(size: number, {footprint, iconGrow} = geometryAt(size)): number {
     return Math.round((size + footprint - (size + iconGrow) * 7 / 9) / 2);
 }
 
@@ -96,8 +97,76 @@ export function showAppsPadding(size: number): number {
  * _styleHandle() adds this margin to the spacing toward app icons so the
  * dividers are centered between the visible shapes.
  */
-export function showAppsSymbolMargin(size: number): number {
-    const {footprint} = geometryAt(size);
-    const symbol = size + footprint - 2 * showAppsPadding(size);
+export function showAppsSymbolMargin(size: number, g = geometryAt(size)): number {
+    const symbol = size + g.footprint - 2 * showAppsPadding(size, g);
     return Math.round(symbol / 6);
+}
+
+/** Offset between the Show Apps padding and the space around an app icon. */
+export function showAppsDividerShift(size: number, g: Geometry): number {
+    return showAppsPadding(size, g) - g.tilePadding - g.itemMargin;
+}
+
+/** Fixed theme measurements and available room, in logical pixels. */
+export interface DockMeasurements {
+    alongBorder: number;
+    acrossBorder: number;
+    alongPadding: number;
+    acrossPadding: number;
+    edgeGap: number;
+    dividerLine: number;
+    spacing: number;
+    /** App slots include a drop placeholder while it is present. */
+    appSlots: number;
+    dividers: number;
+    maxLength: number;
+    maxThickness: number;
+}
+
+export function appSlotLength(size: number, g: Geometry): number {
+    return size + g.footprint + 2 * g.itemMargin;
+}
+
+/** Calculate the space needed at an icon size, before applying overflow. */
+export function dockSizeAt(m: DockMeasurements, size: number) {
+    const g = geometryAt(size);
+    const symbolMargin = showAppsSymbolMargin(size, g);
+    const appSlot = appSlotLength(size, g);
+    const showAppsSlot = size + g.footprint - showAppsDividerShift(size, g) - symbolMargin;
+    const divider = 2 * (g.handlePadding + symbolMargin) + m.dividerLine;
+    // Show Apps, Trash, dividers and their spacing stay outside the scrollable strip.
+    const fixedBackgroundLength = m.alongBorder + 2 * g.endPadding + showAppsSlot +
+        appSlot + m.dividers * divider + (m.appSlots + 1 + m.dividers) * m.spacing;
+    const backgroundThickness = m.acrossBorder + size + g.footprint + 2 * g.backgroundPadding;
+    return {
+        length: m.alongPadding + (fixedBackgroundLength + m.appSlots * appSlot),
+        thickness: m.acrossPadding + m.edgeGap + backgroundThickness,
+        fixedLength: m.alongPadding + fixedBackgroundLength,
+        backgroundThickness,
+    };
+}
+
+/** Find the largest fitting size and the room available to the apps strip. */
+export function fitDock(m: DockMeasurements) {
+    let iconSize = MAX_ICON_SIZE;
+    for (; iconSize > MIN_ICON_SIZE; iconSize--) {
+        const {length, thickness} = dockSizeAt(m, iconSize);
+        if (length <= m.maxLength && thickness <= m.maxThickness)
+            break;
+    }
+    const minimum = dockSizeAt(m, MIN_ICON_SIZE);
+    return {
+        iconSize,
+        overflows: minimum.length > m.maxLength,
+        scrollRoom: m.maxLength - minimum.fixedLength,
+    };
+}
+
+/** Cap growth by the extra room available across the visible background. */
+export function dockGrowthCap(m: DockMeasurements, current: number, room: number): number {
+    const limit = dockSizeAt(m, current).backgroundThickness + room;
+    let size = current;
+    while (size < MAX_ICON_SIZE && dockSizeAt(m, size + 1).backgroundThickness <= limit)
+        size++;
+    return size;
 }

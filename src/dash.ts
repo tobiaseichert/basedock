@@ -16,20 +16,16 @@ import type {AppIcon} from 'resource:///org/gnome/shell/ui/appDisplay.js';
 import {Dash, DashItemContainer} from 'resource:///org/gnome/shell/ui/dash.js';
 import type {BaseIcon} from 'resource:///org/gnome/shell/ui/iconGrid.js';
 
-import {geometryAt, showAppsPadding, showAppsSymbolMargin, type Geometry} from './geometry.js';
+import {
+    appSlotLength, DEFAULT_ICON_SIZE, dockGrowthCap, fitDock, geometryAt, MAX_ICON_SIZE,
+    MIN_ICON_SIZE, showAppsDividerShift, showAppsPadding, showAppsSymbolMargin,
+    type DockMeasurements, type Geometry,
+} from './geometry.js';
 import {followIconGrow, iconGrowOf, resizeIcon, setUpGrowingIcon} from './iconGrow.js';
 import {ResizeDrag, ResizeHandle, type ResizeTarget} from './resize.js';
 import {isVertical, orientationOf, stSide, type DockSide} from './side.js';
 import {ChildSlider} from './slide.js';
 import {TrashIcon} from './trash.js';
-
-// Icon sizes are in logical pixels. The icon-size setting stores the preferred
-// size, and dragging can select any integer in the range. Fitting may shrink
-// the icons to MIN_ICON_SIZE, while the thickness limit in src/dock.ts can cap
-// the maximum. Keep the range and default in sync with the GSettings schema.
-const MIN_ICON_SIZE = 16;
-const MAX_ICON_SIZE = 64;
-const DEFAULT_ICON_SIZE = 48;
 
 // Use the stock dash's DASH_ANIMATION_TIME for item slides and drop
 // animations.
@@ -430,7 +426,7 @@ export const BasedockDash = GObject.registerClass({
      * including in right-to-left rows.
      */
     _styleShowAppsDivider(g: Geometry) {
-        const shift = this.#showAppsShift(this.iconSize);
+        const shift = showAppsDividerShift(this.iconSize, g);
         let [before, after] = ['left', 'right'];
         if (this._vertical)
             [before, after] = ['top', 'bottom'];
@@ -444,22 +440,12 @@ export const BasedockDash = GObject.registerClass({
     }
 
     /**
-     * In logical pixels, the symbol padding minus an app's tile padding and
-     * item margin. _styleShowAppsDivider() accounts for the symbol's
-     * transparent margin separately.
-     */
-    #showAppsShift(size: number): number {
-        const g = geometryAt(size);
-        return showAppsPadding(size) - (g.tilePadding + g.itemMargin);
-    }
-
-    /**
      * Add the Show Apps symbol's transparent margin to the divider's grab
      * padding on app and Trash sides. This gives dividers the same visual
      * separation from the drawn icons.
      */
     #handlePadding(g: Geometry): number {
-        return g.handlePadding + showAppsSymbolMargin(this.iconSize);
+        return g.handlePadding + showAppsSymbolMargin(this.iconSize, g);
     }
 
     /**
@@ -596,7 +582,7 @@ export const BasedockDash = GObject.registerClass({
     #slotLength(): number {
         const g = geometryAt(this.iconSize);
         const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
-        return (this.iconSize + g.footprint + 2 * g.itemMargin) * scaleFactor;
+        return appSlotLength(this.iconSize, g) * scaleFactor;
     }
 
     /** The app items currently in the dock (not ones animating out). */
@@ -1145,17 +1131,12 @@ export const BasedockDash = GObject.registerClass({
      * Check each size step because thicker padding makes a one-pixel icon
      * increase grow the background by more than one pixel at some sizes.
      */
-    _growCap(): number {
+    _growCap(measurements = this._dockMeasurements()): number {
         const room = this._growLimit();
-        const sizes = this._dockSizes();
-        if (room === Infinity || !sizes)
+        if (room === Infinity || !measurements)
             return MAX_ICON_SIZE;
         const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
-        const limit = sizes.backgroundThickness(this.iconSize) + room / scaleFactor;
-        let size = this.iconSize;
-        while (size < MAX_ICON_SIZE && sizes.backgroundThickness(size + 1) <= limit)
-            size++;
-        return size;
+        return dockGrowthCap(measurements, this.iconSize, room / scaleFactor);
     }
 
     /**
@@ -1185,7 +1166,9 @@ export const BasedockDash = GObject.registerClass({
 
     /** Allowed icon sizes: [min, max] right now (max depends on the screen and tiled windows). */
     iconSizeRange(): [number, number] {
-        const max = Math.min(MAX_ICON_SIZE, this._fittingIconSize() ?? MAX_ICON_SIZE, this._growCap());
+        const measurements = this._dockMeasurements();
+        const fitting = measurements ? fitDock(measurements).iconSize : MAX_ICON_SIZE;
+        const max = Math.min(fitting, this._growCap(measurements));
         return [Math.min(MIN_ICON_SIZE, max), max];
     }
 
@@ -1277,12 +1260,11 @@ export const BasedockDash = GObject.registerClass({
     #fit(automatic: boolean) {
         if (this._drag)
             return;
-        const sizes = this._dockSizes();
-        if (!sizes)
+        const measurements = this._dockMeasurements();
+        if (!measurements)
             return;
-        this.#syncOverflow(sizes.maxLength - sizes.fixedLength(MIN_ICON_SIZE),
-            sizes.length(MIN_ICON_SIZE) > sizes.maxLength);
-        const fitting = this._fittingIconSize(sizes)!;
+        const {iconSize: fitting, scrollRoom, overflows} = fitDock(measurements);
+        this.#syncOverflow(scrollRoom, overflows);
         const size = Math.max(MIN_ICON_SIZE, Math.min(this._preferredIconSize, fitting));
         if (size === this._targetIconSize)
             return;
@@ -1376,18 +1358,11 @@ export const BasedockDash = GObject.registerClass({
     }
 
     /**
-     * Compute dock dimensions in logical pixels for a proposed integer icon
-     * size. Length runs along the dock, and thickness runs across it.
-     * Background dimensions cover the visible surface. The dash's overall
-     * dimensions also include its padding and screen-edge gap. setMaxSize()
-     * supplies the available room.
-     *
-     * Compute the dimensions from the proposed size because padding and gaps
-     * scale with the icons. Read fixed lengths from the theme and count an
-     * active drop placeholder as an app. Return null until the dock is styled
-     * and its available room is known.
+     * Read the fixed lengths and available room in logical pixels. The
+     * sizing functions can reuse this snapshot for every candidate icon
+     * size. Return null until there is room to measure on the stage.
      */
-    _dockSizes() {
+    _dockMeasurements(): DockMeasurements | null {
         if (this._maxWidth === -1 || this._maxHeight === -1 || !this.get_stage())
             return null;
 
@@ -1401,44 +1376,17 @@ export const BasedockDash = GObject.registerClass({
         const [along, across] = vertical
             ? [[St.Side.TOP, St.Side.BOTTOM], [St.Side.LEFT, St.Side.RIGHT]]
             : [[St.Side.LEFT, St.Side.RIGHT], [St.Side.TOP, St.Side.BOTTOM]];
-        const handles = [this._showAppsHandle, this._trashHandle, this._separatorHandle]
-            .filter(handle => handle);
-        const line = logical(this._showAppsHandle.lineThickness());
-        const spacing = logical(node.get_length('spacing'));
-        // The apps, the Trash and the drop placeholder.
-        const tiles = this._appItems().length + 1 + (this._dragPlaceholder ? 1 : 0);
-
-        const apps = tiles - 1;
-        const fixedBackgroundLength = (size: number) => {
-            const g = geometryAt(size);
-            return borders(along) +
-                2 * g.endPadding +
-                // Show Apps, Trash, dividers and their spacing. The apps
-                // and optional placeholder live in the scrollable strip.
-                size + g.footprint - this.#showAppsShift(size) - showAppsSymbolMargin(size) +
-                size + g.footprint + 2 * g.itemMargin +
-                handles.length * (2 * (g.handlePadding + showAppsSymbolMargin(size)) + line) +
-                (tiles + handles.length) * spacing;
-        };
-        const backgroundLength = (size: number) => {
-            const g = geometryAt(size);
-            return fixedBackgroundLength(size) + apps * (size + g.footprint + 2 * g.itemMargin);
-        };
-        const backgroundThickness = (size: number) => {
-            const g = geometryAt(size);
-            return borders(across) + size + g.footprint + 2 * g.backgroundPadding;
-        };
-        const edgeGap = logical(background.get_margin(stSide(this._side)));
-        const [alongPadding, acrossPadding] = vertical
-            ? [node.get_vertical_padding(), node.get_horizontal_padding()]
-            : [node.get_horizontal_padding(), node.get_vertical_padding()];
         return {
-            backgroundLength,
-            backgroundThickness,
-            length: (size: number) => logical(alongPadding) + backgroundLength(size),
-            thickness: (size: number) =>
-                logical(acrossPadding) + edgeGap + backgroundThickness(size),
-            fixedLength: (size: number) => logical(alongPadding) + fixedBackgroundLength(size),
+            alongBorder: borders(along),
+            acrossBorder: borders(across),
+            alongPadding: logical(vertical ? node.get_vertical_padding() : node.get_horizontal_padding()),
+            acrossPadding: logical(vertical ? node.get_horizontal_padding() : node.get_vertical_padding()),
+            edgeGap: logical(background.get_margin(stSide(this._side))),
+            dividerLine: logical(this._showAppsHandle.lineThickness()),
+            spacing: logical(node.get_length('spacing')),
+            appSlots: this._appItems().length + (this._dragPlaceholder ? 1 : 0),
+            dividers: [this._showAppsHandle, this._trashHandle, this._separatorHandle]
+                .filter(handle => handle).length,
             maxLength: logical(vertical ? this._maxHeight : this._maxWidth),
             maxThickness: logical(vertical
                 ? this._maxWidth - this.margin_left - this.margin_right
@@ -1519,21 +1467,6 @@ export const BasedockDash = GObject.registerClass({
         } else if (this.#overflowView.natural_width !== length) {
             this.#overflowView.width = length;
         }
-    }
-
-    /**
-     * Return the largest size that fits, or MIN_ICON_SIZE if the dock
-     * overflows even at that size. Return null until _dockSizes() can
-     * compute the available room.
-     */
-    _fittingIconSize(sizes = this._dockSizes()): number | null {
-        if (!sizes)
-            return null;
-        for (let size = MAX_ICON_SIZE; size > MIN_ICON_SIZE; size--) {
-            if (sizes.length(size) <= sizes.maxLength && sizes.thickness(size) <= sizes.maxThickness)
-                return size;
-        }
-        return MIN_ICON_SIZE;
     }
 });
 

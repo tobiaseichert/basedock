@@ -107,9 +107,10 @@ cd basedock
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Typechecks, lints, checks session isolation and runs the headless integration suite. Allow about three minutes. |
+| `npm run check` | Typechecks, lints, checks session isolation and geometry, and runs the headless integration suite. Allow about three minutes. |
 | `npm run typecheck` | Checks TypeScript in `src/`. |
 | `npm run lint` | Checks source and test style. Use `npm run lint -- --fix` for automatic fixes. |
+| `npm run test:geometry` | Checks dock sizing and overflow without starting GNOME Shell. |
 | `npm test` | Runs the integration harness with a virtual monitor and a GTK test window. |
 | `npm run build` | Assembles the unpacked extension in `dist/`. |
 | `npm run nested` | Opens a fresh build in a nested GNOME Shell window. |
