@@ -749,14 +749,7 @@ function checkRunningDot() {
         `gap=${gap} color=${color.to_string?.() ?? [color.red, color.green, color.blue]}`);
 }
 
-async function testWindowIndicator(window) {
-    const tracker = Shell.WindowTracker.get_default();
-    const dot = () => appItems().find(item => item.child?.app === tracker.get_window_app(window))?.child._dot;
-    const secondWindow = () => global.display.list_all_windows()
-        .find(w => w.get_title() === 'basedock second test window');
-    const isDot = () => dot()?.visible && dot().width > 0 && dot().width === dot().height;
-    check('window indicator: a single window has a dot', isDot());
-
+async function openTestAppWindow(title) {
     // Activate the existing GTK fixture on the private session bus to open
     // another window belonging to the same application.
     await new Promise((resolve, reject) => {
@@ -771,7 +764,19 @@ async function testWindowIndicator(window) {
                 }
             });
     });
-    const second = await waitFor(secondWindow, 5000);
+    return waitFor(() => global.display.list_all_windows()
+        .find(window => window.get_title() === title), 5000);
+}
+
+async function testWindowIndicator(window) {
+    const tracker = Shell.WindowTracker.get_default();
+    const dot = () => appItems().find(item => item.child?.app === tracker.get_window_app(window))?.child._dot;
+    const secondWindow = () => global.display.list_all_windows()
+        .find(w => w.get_title() === 'basedock second test window');
+    const isDot = () => dot()?.visible && dot().width > 0 && dot().width === dot().height;
+    check('window indicator: a single window has a dot', isDot());
+
+    const second = await openTestAppWindow('basedock second test window');
     try {
         const grouped = second && await waitFor(() =>
             tracker.get_window_app(window) === tracker.get_window_app(second), 5000);
@@ -797,6 +802,55 @@ async function testWindowIndicator(window) {
         await settle();
     }
     check('window indicator: closing the second window restores the dot', isDot());
+}
+
+/** Use real dock clicks to cycle three windows, one of which starts minimized. */
+async function testWindowCycle(window) {
+    const tracker = Shell.WindowTracker.get_default();
+    const icon = () => appItems().find(item => item.child?.app === tracker.get_window_app(window))?.child;
+    const second = await openTestAppWindow('basedock second test window');
+    let third;
+    try {
+        third = await openTestAppWindow('basedock third test window');
+        const grouped = second && third && await waitFor(() =>
+            [second, third].every(w => tracker.get_window_app(w) === tracker.get_window_app(window)), 5000);
+        check('window cycle: the test app owns three windows', grouped);
+        if (!grouped)
+            return;
+
+        for (const side of ['bottom', 'left', 'right']) {
+            settings().set_string('position', side);
+            second.minimize();
+            await settle();
+            window.activate(global.get_current_time());
+            await settle();
+            if (global.display.focus_window !== window)
+                await dragActorBy(icon(), 0, 0);
+            const initial = global.display.focus_window;
+            const focused = [];
+            for (let i = 0; i < 3; i++) {
+                await dragActorBy(icon(), 0, 0);
+                focused.push(global.display.focus_window);
+            }
+            check(`${side}: clicks visit both other windows and wrap to the start`,
+                [window, second, third].includes(initial) &&
+                [window, second, third].filter(w => w !== initial)
+                    .every(w => focused.slice(0, 2).includes(w)) &&
+                focused[2] === initial && !second.minimized && !icon()._menu?.isOpen,
+                `initial=${initial?.get_title()} focus order=${focused.map(w => w?.get_title()).join(', ')}`);
+        }
+    } finally {
+        settings().set_string('position', 'bottom');
+        second?.delete(global.get_current_time());
+        third?.delete(global.get_current_time());
+        await waitFor(() => !global.display.list_all_windows().some(w => w === second || w === third), 5000);
+        await settle();
+    }
+    window.minimize();
+    await settle();
+    await dragActorBy(icon(), 0, 0);
+    check('window cycle: a single minimized window restores on the first click',
+        global.display.focus_window === window && !window.minimized);
 }
 
 /** Trash: a tile's footprint, and its icon follows the trash's state. */
@@ -2475,6 +2529,7 @@ async function main() {
     // The dock at the left and the right edge, then back at the bottom.
     await testSides(window);
     await testWindowIndicator(window);
+    await testWindowCycle(window);
     await checkInterruptedDrag();
 
     // Try teardown while Shell still owns the open popup's grab.

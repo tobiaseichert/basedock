@@ -44,6 +44,9 @@ const UNMATCHED_APP_DELAY_MS = 1000;
 // Style class that highlights the tile of a running app.
 const RUNNING_CLASS = 'basedock-running';
 
+// Follow the app menu in appMenu.js, including minimized windows.
+const appWindows = (app: Shell.App) => app.get_windows().filter(window => !window.skip_taskbar);
+
 // Match DASH_ITEM_LABEL_SHOW_TIME in dash.js when fading in tooltips.
 const LABEL_SHOW_TIME = 150;
 
@@ -510,8 +513,7 @@ export const BasedockDash = GObject.registerClass({
             : 0;
         const offset = g.dotGap - (g.backgroundPadding + border - g.dotSize);
         const dot = appIcon._dot;
-        // Match the app menu's window list, including minimized windows.
-        const multiple = appIcon.app.get_windows().filter(window => !window.skip_taskbar).length > 1;
+        const multiple = appWindows(appIcon.app).length > 1;
         const length = multiple ? 3 * g.dotSize : g.dotSize;
         const width = this._vertical ? g.dotSize : length;
         const height = this._vertical ? length : g.dotSize;
@@ -673,6 +675,7 @@ export const BasedockDash = GObject.registerClass({
         // Icons grow into their tile's padding (src/geometry.ts).
         followIconGrow(appIcon.icon, size => geometryAt(size).iconGrow);
         this.#dragWithTile(appIcon);
+        this.#cycleAppWindows(appIcon);
         this._syncRunningIcon(appIcon);
         this._styleAppIcon(appIcon, geometryAt(this.iconSize));
         app.connectObject('windows-changed',
@@ -694,6 +697,47 @@ export const BasedockDash = GObject.registerClass({
             }, this);
         }
         return item;
+    }
+
+    /**
+     * Wrap AppIcon.activate() (appDisplay.js) on this dock item only.
+     * Keep GNOME's launch and focus behavior until one of the app's windows
+     * has focus. Freeze the cycle order so activating a window does not
+     * move it to the front and cause repeated clicks to alternate a pair.
+     */
+    #cycleAppWindows(icon: AppIcon) {
+        const activate = icon.activate.bind(icon);
+        // Keep IDs so a pinned icon cannot retain closed windows.
+        const windowId = (window: Meta.Window) => window.get_stable_sequence();
+        let order: number[] = [];
+        let lastActivated: number | null = null;
+
+        icon.activate = button => {
+            const event = Clutter.get_current_event();
+            const modifiers = event?.get_state() ?? 0;
+            const focused = global.display.focus_window;
+            const windows = appWindows(icon.app);
+            if (button !== Clutter.BUTTON_PRIMARY || (modifiers & Clutter.ModifierType.CONTROL_MASK) ||
+                windows.length < 2 || !focused || !windows.includes(focused)) {
+                order = [];
+                lastActivated = null;
+                activate(button);
+                return;
+            }
+
+            const focusedId = windowId(focused);
+            const byId = new Map(windows.map(window => [windowId(window), window]));
+            if (focusedId !== lastActivated || windows.length !== order.length ||
+                order.some(id => !byId.has(id))) {
+                const workspace = global.workspace_manager.get_active_workspace();
+                // Keep Shell's order within each group, starting on this workspace.
+                order = windows.sort((a, b) =>
+                    Number(b.located_on_workspace(workspace)) - Number(a.located_on_workspace(workspace)))
+                    .map(windowId);
+            }
+            lastActivated = order[(order.indexOf(focusedId) + 1) % order.length];
+            Main.activateWindow(byId.get(lastActivated)!, event?.get_time() ?? global.get_current_time());
+        };
     }
 
     /**

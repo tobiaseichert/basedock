@@ -41,7 +41,9 @@ with the same command.
 
 Dividers separate Show Apps, favorites, other running apps and Trash. Running
 apps have a highlighted tile and a running dot. A short bar marks apps with
-multiple windows, including minimized ones. When possible, windows minimize
+multiple windows, including minimized ones. Click an app icon to focus the
+app. Once it has focus, click its icon again to cycle through its windows,
+restoring any minimized window you reach. When possible, windows minimize
 toward their app's tile and restore from it.
 
 If the dock gets crowded, icons shrink to keep it clear of the screen corners
