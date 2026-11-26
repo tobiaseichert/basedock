@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 Tobias Eichert
+  SPDX-License-Identifier: GPL-2.0-or-later
+-->
+<schemalist gettext-domain="basedock">
+  <enum id="org.gnome.shell.extensions.basedock.Style">
+    <value nick="system" value="0"/>
+    <value nick="light" value="1"/>
+    <value nick="dark" value="2"/>
+  </enum>
+  <enum id="org.gnome.shell.extensions.basedock.Position">
+    <value nick="bottom" value="0"/>
+    <value nick="left" value="1"/>
+    <value nick="right" value="2"/>
+  </enum>
+  <schema id="org.gnome.shell.extensions.basedock" path="/org/gnome/shell/extensions/basedock/">
+    <key name="icon-size" type="i">
+      <range min="16" max="64"/>
+      <default>48</default>
+      <summary>Icon size</summary>
+      <description>Preferred size of the dock's icons in logical pixels. The dock uses a smaller size if this doesn't fit the screen. Set by dragging a divider.</description>
+    </key>
+    <key name="style" enum="org.gnome.shell.extensions.basedock.Style">
+      <default>'system'</default>
+      <summary>Dock style</summary>
+      <description>Light or dark dock. "system" follows GNOME's style (Settings → Appearance: Default is light, Dark is dark); "light" and "dark" are fixed. The dock is always dark in the overview. Set in the dock's menu (right-click).</description>
+    </key>
+    <key name="position" enum="org.gnome.shell.extensions.basedock.Position">
+      <default>'bottom'</default>
+      <summary>Dock position</summary>
+      <description>The screen edge the dock sits at, on the primary monitor: "bottom", "left" or "right". Set in the dock's menu (right-click).</description>
+    </key>
+  </schema>
+</schemalist>

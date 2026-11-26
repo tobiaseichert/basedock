@@ -1,0 +1,112 @@
+# German translation for baseDOCK.
+# Copyright (C) 2026 Tobias Eichert
+# This file is distributed under the same license as the baseDOCK package.
+# Tobias Eichert <git@tobiaseichert.de>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: baseDOCK\n"
+"Report-Msgid-Bugs-To: https://github.com/tobiaseichert/basedock/issues\n"
+"POT-Creation-Date: 2026-11-24 13:06+0100\n"
+"PO-Revision-Date: 2026-11-24 21:30+0100\n"
+"Last-Translator: Tobias Eichert <git@tobiaseichert.de>\n"
+"Language-Team: German\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: schemas/org.gnome.shell.extensions.basedock.gschema.xml:21
+msgid "Icon size"
+msgstr "Symbolgröße"
+
+#: schemas/org.gnome.shell.extensions.basedock.gschema.xml:22
+msgid ""
+"Preferred size of the dock's icons in logical pixels. The dock uses a "
+"smaller size if this doesn't fit the screen. Set by dragging a divider."
+msgstr ""
+"Bevorzugte Größe der Symbole im Dock, in logischen Pixeln. Passt sie nicht "
+"auf den Bildschirm, verwendet das Dock eine kleinere. Wird durch Ziehen "
+"eines Trenners festgelegt."
+
+#: schemas/org.gnome.shell.extensions.basedock.gschema.xml:26
+msgid "Dock style"
+msgstr "Dock-Stil"
+
+#: schemas/org.gnome.shell.extensions.basedock.gschema.xml:27
+msgid ""
+"Light or dark dock. \"system\" follows GNOME's style (Settings → Appearance: "
+"Default is light, Dark is dark); \"light\" and \"dark\" are fixed. The dock "
+"is always dark in the overview. Set in the dock's menu (right-click)."
+msgstr ""
+"Helles oder dunkles Dock. »system« folgt dem Stil von GNOME (Einstellungen → "
+"Erscheinungsbild: Vorgabe ist hell, Dunkel ist dunkel); »light« und »dark« "
+"sind fest. In der Übersicht ist das Dock immer dunkel. Wird im Menü des "
+"Docks festgelegt (Rechtsklick)."
+
+#: schemas/org.gnome.shell.extensions.basedock.gschema.xml:31
+msgid "Dock position"
+msgstr "Dock-Position"
+
+#: schemas/org.gnome.shell.extensions.basedock.gschema.xml:32
+msgid ""
+"The screen edge the dock sits at, on the primary monitor: \"bottom\", "
+"\"left\" or \"right\". Set in the dock's menu (right-click)."
+msgstr ""
+"Der Bildschirmrand, an dem das Dock sitzt, auf dem Hauptbildschirm: "
+"»bottom«, »left« oder »right«. Wird im Menü des Docks festgelegt "
+"(Rechtsklick)."
+
+#: src/dockMenu.ts:22
+msgid "Dock Style"
+msgstr "Dock-Stil"
+
+#: src/dockMenu.ts:25
+msgid "Follow System"
+msgstr "Dem System folgen"
+
+#. Translators: GNOME's light style, labelled "_Default" in
+#. Settings → Appearance; use its translation there, without the
+#. underscore (the access key).
+#: src/dockMenu.ts:29
+msgid "Default"
+msgstr "Vorgabe"
+
+#. Translators: GNOME's dark style, labelled "Da_rk" in Settings →
+#. Appearance; use its translation there, without the underscore
+#. (the access key).
+#: src/dockMenu.ts:33
+msgid "Dark"
+msgstr "Dunkel"
+
+#: src/dockMenu.ts:38
+msgid "Position"
+msgstr "Position"
+
+#. Translators: the dock's position, at the bottom of the screen.
+#: src/dockMenu.ts:42
+msgid "Bottom"
+msgstr "Unten"
+
+#. Translators: the dock's position, at the left edge of the screen.
+#: src/dockMenu.ts:44
+msgid "Left"
+msgstr "Links"
+
+#. Translators: the dock's position, at the right edge of the screen.
+#: src/dockMenu.ts:46
+msgid "Right"
+msgstr "Rechts"
+
+#: src/trash.ts:67
+msgid "Trash"
+msgstr "Papierkorb"
+
+#: src/trash.ts:135
+msgid "Open"
+msgstr "Öffnen"
+
+#: src/trash.ts:137
+msgid "Empty Trash"
+msgstr "Papierkorb leeren"

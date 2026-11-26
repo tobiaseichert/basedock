@@ -1,0 +1,14 @@
+{
+  "name": "basedock-lint",
+  "description": "ESLint for baseDOCK, kept apart from the build: typescript-eslint needs the TypeScript 6 compiler API, which TypeScript 7 (the build's compiler) doesn't have.",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.72.2"
+  }
+}

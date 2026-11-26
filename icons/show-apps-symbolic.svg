@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!--
+    The Show Apps symbol: GNOME Shell's 3 × 3 app grid of dots, drawn
+    tighter (gaps half a dot wide) and with margins, so the dots span 2/3
+    of the icon box (stylesheet.css: Show Apps).
+
+    Keep <svg> at the very start of the file: St detects the file type from
+    its first bytes, and fails to load it if a comment comes first. The
+    name must end in -symbolic.svg for St to recolor it with the CSS color.
+
+    SPDX-FileCopyrightText: 2026 Tobias Eichert
+    SPDX-License-Identifier: GPL-2.0-or-later
+  -->
+  <g fill="#241f31">
+    <circle cx="6" cy="6" r="2"/>
+    <circle cx="12" cy="6" r="2"/>
+    <circle cx="18" cy="6" r="2"/>
+    <circle cx="6" cy="12" r="2"/>
+    <circle cx="12" cy="12" r="2"/>
+    <circle cx="18" cy="12" r="2"/>
+    <circle cx="6" cy="18" r="2"/>
+    <circle cx="12" cy="18" r="2"/>
+    <circle cx="18" cy="18" r="2"/>
+  </g>
+</svg>

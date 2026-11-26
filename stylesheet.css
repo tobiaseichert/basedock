@@ -1,0 +1,282 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Tobias Eichert
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+/*
+ * The dock inherits the theme's #dash rules. Scope dock overrides to
+ * #dash.basedock. The stock host, drag image and menu have their own
+ * selectors.
+ *
+ * src/geometry.ts scales these reference lengths from the default 48px icon
+ * size. src/dash.ts applies them as inline styles and uses them to calculate
+ * how many items fit.
+ * - P = 12px background padding.
+ * - T = 3px tile padding. G = 6px added to the drawn icon size. The tile
+ *   footprint stays at icon size + F, where F = 2T + G = 12px.
+ * - R = 10px tile radius. B = 16px background radius, smaller than R + P to
+ *   keep the background corners less rounded.
+ * - S = 5px item margin on each side along the dock. Tiles sit 2S apart and
+ *   drawn icons sit 2T + 2S apart. Use P - S as end padding so the outer item
+ *   margins bring it back to P.
+ *
+ * E = 8px is the fixed gap to the screen edge. Keep the screen-edge item
+ * padding, background margin and divider margin equal to E. This aligns the
+ * icons with the background and lets the click targets reach the screen edge.
+ * The side rules move E to the left or right edge and the code swaps lengths
+ * along and across the dock.
+ *
+ * Show Apps fills one tile footprint with its symbol and padding. At the
+ * reference size, dividers have 4px of grab padding on each side and an extra
+ * 7px toward app and Trash icons to match the symbol's transparent margin. The
+ * divider after Show Apps is adjusted to center its line between the drawn
+ * icons. The running dot sits 4px from the tile toward the screen edge and is
+ * 5px wide at the reference size. Background padding must leave room for it.
+ * The drag image reuses T, R and G.
+ *
+ * The normal palettes are translucent so the rounded blur in src/blur.ts
+ * remains visible. Dark uses light dividers and light uses dark dividers. Both
+ * use white running dots with a dark halo. High Contrast uses an opaque dark
+ * fill, a solid 2px border and stronger controls. Fitting reads border widths
+ * from the theme.
+ */
+
+/*
+ * _applyGeometry() sets the background padding and corner radius. The
+ * centered shadow extends beyond the dash, so src/dash.ts limits offscreen
+ * rendering to fades to avoid clipping it.
+ */
+#dash.basedock .dash-background {
+    margin-bottom: 8px;         /* E */
+    background-color: rgba(56, 56, 59, 0.65);   /* #38383b */
+    box-shadow: 0 0 12px 3px rgba(0, 0, 0, 0.13);
+    transition-duration: 0ms;
+}
+
+#dash.basedock.basedock-light .dash-background {
+    background-color: rgba(228, 228, 232, 0.32);
+}
+
+/*
+ * #lineThickness() rounds the divider's 1px line to a whole physical pixel
+ * width. This keeps all dividers equally thick at fractional scales.
+ */
+#dash.basedock .dash-separator {
+    margin-bottom: 8px;         /* E */
+    background-color: rgba(255, 255, 255, 0.25);
+    transition-duration: 0ms;
+}
+
+/*
+ * Match ANIMATION_TIME in js/ui/overview.js for ordinary palette fades,
+ * including overview transitions.
+ */
+#dash.basedock.basedock-color-fade .dash-background,
+#dash.basedock.basedock-color-fade .dash-separator {
+    transition-duration: 250ms;
+}
+
+/*
+ * Match FADE_ANIMATION_TIME in js/ui/background.js when a color scheme change
+ * also cross-fades the wallpaper.
+ */
+#dash.basedock.basedock-wallpaper-fade .dash-background,
+#dash.basedock.basedock-wallpaper-fade .dash-separator {
+    transition-duration: 1000ms;
+}
+
+#dash.basedock.basedock-light .dash-separator {
+    background-color: rgba(0, 0, 0, 0.35);
+}
+
+/*
+ * Use the stock high-contrast palette. Draw the rim as a border so
+ * _dockSizes() includes it in fitting. Clear both the stock inset shadow and
+ * the dock's drop shadow so the rim appears the same thickness across desktop
+ * and overview backgrounds.
+ */
+#dash.basedock.basedock-high-contrast .dash-background {
+    background-color: #252525;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: none;
+}
+
+#dash.basedock.basedock-high-contrast .dash-separator {
+    background-color: rgba(255, 255, 255, 0.6);
+}
+
+#dash.basedock.basedock-high-contrast .show-apps .show-apps-icon {
+    color: #ffffff;
+}
+
+/*
+ * Remove the stock host's padding so the dock can use its full width.
+ */
+#dash.basedock-host {
+    padding: 0;
+}
+
+/*
+ * The transparent handle extends the divider's grab area. Keep its line steady
+ * through pointer states and use the resize cursor for feedback.
+ */
+#dash.basedock .basedock-handle {
+    margin-bottom: 8px;         /* E */
+}
+
+#dash.basedock .basedock-handle .dash-separator {
+    margin: 0;
+}
+
+#dash.basedock .dash-item-container .overview-tile,
+#dash.basedock .dash-item-container .basedock-trash {
+    padding-bottom: 8px;        /* E */
+}
+
+#dash.basedock .dash-item-container .show-apps {
+    padding-bottom: 8px;        /* E */
+}
+
+/*
+ * App and Trash tiles start transparent. _applyGeometry() sets tile padding
+ * and radius, and src/iconGrow.ts extends each icon into that padding.
+ */
+#dash.basedock .dash-item-container .overview-tile .overview-icon,
+#dash.basedock .dash-item-container .basedock-trash .overview-icon {
+    border-width: 0;
+    background-color: transparent;
+}
+
+/*
+ * Show a softer gradient for running apps and a stronger one for hover, focus
+ * and press. The interaction rules come last so they win at equal specificity.
+ * Set the full gradient in each rule because St stores its start as the
+ * background color.
+ */
+#dash.basedock .dash-item-container .overview-tile.basedock-running .overview-icon {
+    background-gradient-direction: vertical;
+    background-gradient-start: rgba(255, 255, 255, 0.29);
+    background-gradient-end: rgba(255, 255, 255, 0.19);
+}
+
+#dash.basedock .dash-item-container .overview-tile:hover .overview-icon,
+#dash.basedock .dash-item-container .overview-tile:focus .overview-icon,
+#dash.basedock .dash-item-container .overview-tile:active .overview-icon,
+#dash.basedock .dash-item-container .basedock-trash:hover .overview-icon,
+#dash.basedock .dash-item-container .basedock-trash:focus .overview-icon,
+#dash.basedock .dash-item-container .basedock-trash:active .overview-icon {
+    background-gradient-direction: vertical;
+    background-gradient-start: rgba(255, 255, 255, 0.36);
+    background-gradient-end: rgba(255, 255, 255, 0.24);
+}
+
+/*
+ * Give Show Apps the same footprint as an app tile. At the default size,
+ * showAppsPadding() gives the 42px symbol 9px of padding on each side. The SVG
+ * dots span 28px, and _styleShowAppsDivider() uses that visible width to
+ * center the next divider.
+ *
+ * Clear stock button backgrounds and shadows in each state so feedback comes
+ * from the symbol's color.
+ */
+#dash.basedock .dash-item-container .show-apps .overview-icon,
+#dash.basedock .dash-item-container .show-apps:hover .overview-icon,
+#dash.basedock .dash-item-container .show-apps:focus .overview-icon,
+#dash.basedock .dash-item-container .show-apps:active .overview-icon,
+#dash.basedock .dash-item-container .show-apps:checked .overview-icon {
+    border-width: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+#dash.basedock .show-apps .show-apps-icon {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+/*
+ * Brighten the symbol on interaction, when an icon is dragged onto it to
+ * unpin, and while the app grid is open.
+ */
+#dash.basedock .show-apps:hover .show-apps-icon,
+#dash.basedock .show-apps:focus .show-apps-icon,
+#dash.basedock .show-apps:active .show-apps-icon,
+#dash.basedock .show-apps:checked .show-apps-icon {
+    color: #ffffff;
+}
+
+/* _styleAppIcon() positions and sizes the running dot. */
+#dash.basedock .dash-item-container .app-grid-running-dot {
+    background-color: #ffffff;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);    /* visible on the light dock too */
+}
+
+/*
+ * Use an opaque gradient to reproduce the tile's appearance when the drag
+ * image is drawn away from the dock. The light variant has enough contrast to
+ * remain visible over light backgrounds.
+ */
+.basedock-drag-tile {
+    border-width: 0;            /* padding T, corners R: src/dash.ts */
+    background-gradient-direction: vertical;
+    background-gradient-start: #808082;
+    background-gradient-end: #68686a;
+}
+
+.basedock-drag-tile.basedock-light {
+    background-gradient-start: #e6e6e9;
+    background-gradient-end: #d2d2d6;
+}
+
+/*
+ * Move E from the bottom to the physical screen edge on side docks. Rotate the
+ * end padding and separator lines with the layout. src/resize.ts sets each
+ * line's length.
+ */
+#dash.basedock.basedock-vertical {
+    padding: 6px 0;
+}
+
+#dash.basedock.basedock-vertical .dash-background,
+#dash.basedock.basedock-vertical .basedock-handle {
+    margin-bottom: 0;
+}
+
+#dash.basedock.basedock-vertical .dash-item-container .overview-tile,
+#dash.basedock.basedock-vertical .dash-item-container .basedock-trash,
+#dash.basedock.basedock-vertical .dash-item-container .show-apps {
+    padding-bottom: 0;
+}
+
+#dash.basedock.basedock-vertical .basedock-handle .dash-separator {
+    height: 1px;
+}
+
+#dash.basedock.basedock-left .dash-background,
+#dash.basedock.basedock-left .basedock-handle {
+    margin-left: 8px;           /* E */
+}
+
+#dash.basedock.basedock-left .dash-item-container .overview-tile,
+#dash.basedock.basedock-left .dash-item-container .basedock-trash,
+#dash.basedock.basedock-left .dash-item-container .show-apps {
+    padding-left: 8px;          /* E */
+}
+
+#dash.basedock.basedock-right .dash-background,
+#dash.basedock.basedock-right .basedock-handle {
+    margin-right: 8px;          /* E */
+}
+
+#dash.basedock.basedock-right .dash-item-container .overview-tile,
+#dash.basedock.basedock-right .dash-item-container .basedock-trash,
+#dash.basedock.basedock-right .dash-item-container .show-apps {
+    padding-right: 8px;         /* E */
+}
+
+/*
+ * Show menu hover feedback immediately, matching libadwaita menus. The stock
+ * Shell theme fades .popup-menu-item over 100ms.
+ */
+.basedock-menu .popup-menu-item {
+    transition-duration: 0ms;
+}

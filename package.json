@@ -1,0 +1,25 @@
+{
+  "name": "basedock",
+  "version": "1.0.0",
+  "description": "A drop-in replacement for GNOME's dash, with small improvements to its look, style and placement.",
+  "scripts": {
+    "build": "bash -c 'source scripts/lib/common.sh && basedock_build'",
+    "typecheck": "tsc --noEmit",
+    "lint": "scripts/lint.sh",
+    "test": "tests/run-headless.sh tests/harness/integration.js --window --timeout 240",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "capture": "tests/capture.sh",
+    "nested": "scripts/nested.sh",
+    "pack": "scripts/pack.sh",
+    "pot": "scripts/pot.sh",
+    "deploy": "scripts/deploy.sh",
+    "setup:distrobox": "scripts/setup-distrobox.sh"
+  },
+  "license": "GPL-2.0-or-later",
+  "type": "module",
+  "devDependencies": {
+    "@girs/gnome-shell": "^51.0.1",
+    "typescript": "^7.0.2"
+  },
+  "private": true
+}

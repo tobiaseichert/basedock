@@ -1,0 +1,12 @@
+{
+  "uuid": "basedock@basedock",
+  "name": "baseDOCK",
+  "description": "A dock built on GNOME's own dash: always at hand, out of the way of maximized windows, resizable by dragging.",
+  "url": "https://github.com/tobiaseichert/basedock",
+  "version-name": "1.0",
+  "shell-version": [
+    "51"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.basedock",
+  "gettext-domain": "basedock"
+}
