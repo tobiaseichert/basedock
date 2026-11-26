@@ -26,7 +26,7 @@ runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 start=$(date +%s)
 trap 'basedock_remove_stale_marker "$runtime_dir" "$start"; rm -rf "$tmp"' EXIT
 
-cmd=(env XDG_CONFIG_HOME="$tmp/config" XDG_DATA_HOME="$tmp/data" XDG_CACHE_HOME="$tmp/cache"
+cmd=(env BASEDOCK_TMP="$tmp" XDG_CONFIG_HOME="$tmp/config" XDG_DATA_HOME="$tmp/data" XDG_CACHE_HOME="$tmp/cache"
      dbus-run-session "$BASEDOCK_ROOT/scripts/nested.sh" --inner)
 
 if [[ ! -x /usr/libexec/mutter-devkit ]]; then

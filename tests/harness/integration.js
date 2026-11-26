@@ -2269,6 +2269,15 @@ async function testSecondaryMonitor(window) {
     check('monitor isolation: a right dock does not pull a window off the monitor to its right',
         grab === Meta.GrabOp.MOVING && start.x >= secondary.x && end.x === start.x + 10,
         `start=${start.x} end=${end.x} secondary edge=${secondary.x}`);
+
+    await superArrow(window, 'left');
+    const config = settings();
+    config.set_int('icon-size', 56);
+    await settle();
+    check('monitor isolation: a tile on the secondary monitor does not cap dock growth',
+        window.get_monitor() === secondary.index && window.maximized_vertically &&
+        ourDash().iconSize === 56 && config.get_int('icon-size') === 56,
+        `monitor=${window.get_monitor()} tiled=${window.maximized_vertically} size=${ourDash().iconSize} saved=${config.get_int('icon-size')}`);
 }
 
 async function main() {

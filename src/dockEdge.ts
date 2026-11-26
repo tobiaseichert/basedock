@@ -405,8 +405,9 @@ export class DockEdge {
 
     /**
      * Return how far the dock's inner edge can grow in stage pixels before
-     * meeting a non-minimized tile on the active workspace. Return Infinity
-     * when geometry is unavailable or no tile overlaps the dock's span.
+     * meeting a non-minimized tile on the dock's monitor and active
+     * workspace. Return Infinity when geometry is unavailable or no eligible
+     * tile overlaps the dock's span.
      */
     roomBeforeTiles(): number {
         const edge = this.#getTileEdge();
@@ -416,9 +417,11 @@ export class DockEdge {
         const workspace = global.workspace_manager.get_active_workspace();
         let room = Infinity;
         for (const window of this.#tiled) {
+            if (window.minimized || window.get_monitor() !== edge.monitor.index ||
+                !window.located_on_workspace(workspace))
+                continue;
             const rect = frameRect(window, edge);
-            if (window.minimized || !window.located_on_workspace(workspace) ||
-                !overlaps(rect, fe))
+            if (!overlaps(rect, fe))
                 continue;
             room = Math.min(room, Math.max(0, fe.y - bottomOf(rect)));
         }

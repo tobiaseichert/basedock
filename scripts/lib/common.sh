@@ -37,6 +37,12 @@ basedock_stage() {
 # Enable only baseDOCK and suppress first-run UI inside the private session.
 # Require isolated dconf settings before writing them.
 basedock_configure_session() {
+  if [[ -z "${BASEDOCK_TMP:-}" || ! -d "$BASEDOCK_TMP" ||
+        "${XDG_CONFIG_HOME:-}" != "$BASEDOCK_TMP/config" ||
+        -L "$XDG_CONFIG_HOME" || -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    echo "ABORT: run Shell settings setup inside the private test session" >&2
+    exit 1
+  fi
   gsettings set org.gnome.shell enabled-extensions "['$BASEDOCK_UUID']"
   gsettings set org.gnome.shell welcome-dialog-last-shown-version '999'
   sleep 0.5

@@ -107,7 +107,7 @@ cd basedock
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Typechecks, lints and runs the headless integration suite. Allow about three minutes. |
+| `npm run check` | Typechecks, lints, checks session isolation and runs the headless integration suite. Allow about three minutes. |
 | `npm run typecheck` | Checks TypeScript in `src/`. |
 | `npm run lint` | Checks source and test style. Use `npm run lint -- --fix` for automatic fixes. |
 | `npm test` | Runs the integration harness with a virtual monitor and a GTK test window. |

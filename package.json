@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "scripts/lint.sh",
     "test": "tests/run-headless.sh tests/harness/integration.js --window --timeout 240",
-    "check": "npm run typecheck && npm run lint && npm test",
+    "check": "npm run typecheck && npm run lint && bash tests/session-isolation.sh && npm test",
     "capture": "tests/capture.sh",
     "nested": "scripts/nested.sh",
     "pack": "scripts/pack.sh",
