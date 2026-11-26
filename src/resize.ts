@@ -12,7 +12,7 @@ export interface ResizeTarget {
     beginResize(x: number, y: number): void;
     /**
      * Total displacement from the drag start in stage pixels.
-     * Positive `grow` moves away from the screen edge, negative toward it.
+     * Positive `grow` moves up, and negative moves down.
      */
     previewResize(grow: number): void;
     /** The drag ends (or is cancelled) `grow` px away, as in previewResize. */
@@ -21,8 +21,8 @@ export interface ResizeTarget {
 
 /**
  * Attach an actor-owned resize gesture to a divider or the dock's inner
- * border. Drag away from the screen edge to grow and toward it to shrink. The
- * target maps displacement to a size within its limits.
+ * border. Drag up to grow and down to shrink at any dock position. The target
+ * maps vertical displacement to a size within its limits.
  *
  * Clutter.PanGesture, also used in slider.js, follows pointer and touch drags
  * outside the actor. Recognize the press immediately so resizing starts with
@@ -30,19 +30,16 @@ export interface ResizeTarget {
  */
 export class ResizeDrag {
     readonly #target: ResizeTarget;
-    readonly #side: DockSide;
     readonly #gesture: Clutter.PanGesture;
     #grow = 0;
 
-    constructor(actor: Clutter.Actor, target: ResizeTarget, side: DockSide) {
+    constructor(actor: Clutter.Actor, target: ResizeTarget) {
         this.#target = target;
-        this.#side = side;
-        const vertical = isVertical(side);
         actor.reactive = true;
-        actor.cursor_type = vertical ? Clutter.CursorType.EW_RESIZE : Clutter.CursorType.NS_RESIZE;
+        actor.cursor_type = Clutter.CursorType.NS_RESIZE;
 
         this.#gesture = new Clutter.PanGesture({
-            pan_axis: vertical ? Clutter.PanAxis.X : Clutter.PanAxis.Y,
+            pan_axis: Clutter.PanAxis.Y,
             max_n_points: 1,
             required_button: Clutter.BUTTON_PRIMARY,
         });
@@ -64,11 +61,7 @@ export class ResizeDrag {
 
     #onUpdate() {
         const delta = this.#gesture.get_accumulated_delta_abs();
-        let grow = -delta.get_y();
-        if (this.#side === 'left')
-            grow = delta.get_x();
-        else if (this.#side === 'right')
-            grow = -delta.get_x();
+        const grow = -delta.get_y();
         if (grow !== this.#grow) {
             this.#grow = grow;
             this.#target.previewResize(grow);
@@ -97,7 +90,7 @@ export class ResizeHandle {
             : {y_align: Clutter.ActorAlign.CENTER};
         this.line = new St.Widget({style_class: 'dash-separator', ...align});
         this.actor = new St.Bin({style_class: 'basedock-handle', child: this.line, ...align});
-        new ResizeDrag(this.actor, target, side);
+        new ResizeDrag(this.actor, target);
     }
 
     /** Make the line and its grab area `length` long across the dock (the icon size). */

@@ -34,7 +34,7 @@ with the same command.
 | To | Do this |
 | --- | --- |
 | Move the dock | Right-click an empty part of the dock and choose **Position → Bottom**, **Left** or **Right**. The dock stays on the primary monitor. |
-| Resize the dock | Drag a divider or the border facing the center of the screen. Drag away from the screen edge to grow and toward it to shrink. The dock resizes in one-pixel icon-size steps and saves the size when you release. |
+| Resize the dock | Drag a divider or the border facing the center of the screen. Drag up to grow and down to shrink at any dock position. The dock resizes in one-pixel icon-size steps and saves the size when you release. |
 | Change the appearance | Open **Dock Style** from the dock menu. **Follow System** follows GNOME Settings → Appearance. **Default** fixes the dock to light, and **Dark** fixes it to dark. |
 | Open the app grid | Click **Show Apps**. Click it again from the app grid to return to the desktop. With Show Apps focused, the **Menu** key opens the dock settings. |
 | Open or empty Trash | Click **Trash** to open it in the default file manager. Its context menu offers **Empty Trash**, which asks Files to confirm the operation. If the request to Files fails, the dock opens Trash in the default file manager. |

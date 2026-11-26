@@ -1753,9 +1753,9 @@ async function checkSideLayout(side) {
     const gripAtEdge = side === 'left'
         ? Math.round(gx + grip.width) === bg.x + bg.width
         : Math.round(gx) === bg.x;
-    check(`${side}: the edge grip runs along the inner border, a sideways resize cursor`,
+    check(`${side}: the edge grip runs along the inner border, a vertical resize cursor`,
         gripAtEdge && grip.height > grip.width &&
-        grip.cursor_type === Clutter.CursorType.EW_RESIZE,
+        grip.cursor_type === Clutter.CursorType.NS_RESIZE,
         `grip x=${gx} ${grip.width}x${grip.height} background x=${bg.x}-${bg.x + bg.width}`);
 }
 
@@ -1790,15 +1790,18 @@ async function checkSideMenus(side) {
     await settle();
 }
 
-/** Dragging a divider sideways resizes a side dock: away from the screen edge grows it. */
+/** Vertical drags resize a side dock from either grip. */
 async function checkSideResize(side) {
-    const out = side === 'left' ? 1 : -1;
-    await dragActorBy(ourDash()._trashHandle.actor, 8 * out, 0);
-    check(`${side}: dragging a divider away from the screen edge grows the icons`,
+    const divider = ourDash()._trashHandle.actor;
+    await dragActorBy(divider, side === 'left' ? 8 : -8, 0);
+    check(`${side}: a horizontal drag leaves the dock size unchanged`,
+        ourDash().iconSize === 48 && settings().get_int('icon-size') === 48);
+    await dragActorBy(divider, 0, -8);
+    check(`${side}: dragging a divider up grows the icons`,
         ourDash().iconSize === 56 && settings().get_int('icon-size') === 56,
         `iconSize=${ourDash().iconSize} setting=${settings().get_int('icon-size')}`);
-    await dragActorBy(ourDash()._edgeGrip, -8 * out, 0);
-    check(`${side}: dragging the inner border toward the edge shrinks them`,
+    await dragActorBy(ourDash()._edgeGrip, 0, 8);
+    check(`${side}: dragging the inner border down shrinks the icons`,
         ourDash().iconSize === 48 && settings().get_int('icon-size') === 48,
         `iconSize=${ourDash().iconSize} setting=${settings().get_int('icon-size')}`);
     settings().set_int('icon-size', 48);

@@ -533,7 +533,7 @@ export const BasedockDash = GObject.registerClass({
         placement._thickness = () =>
             Math.max(1, Math.round(geometryAt(this.iconSize).backgroundPadding / 2));
         this._edgeGrip.add_constraint(placement);
-        new ResizeDrag(this._edgeGrip, this, this._side);
+        new ResizeDrag(this._edgeGrip, this);
         this.add_child(this._edgeGrip);
     }
 
