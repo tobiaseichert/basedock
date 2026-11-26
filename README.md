@@ -60,7 +60,8 @@ half-screen tiles end at the dock. During a manual dock resize, tiled windows
 keep their size and limit how far the dock can grow.
 
 The dock remains visible in the overview. The window picker and app grid keep
-their clearance as it changes size. App grid pages can still slide behind a
+their clearance as it changes size. The app grid's page dots stay in the same
+place at all three dock positions. App grid pages can still slide behind a
 side dock. The overview uses the dark palette, and GNOME's **High Contrast**
 setting applies an opaque dark background with a solid border. With **Reduced
 Motion**, the dock fades in place during show and hide animations.

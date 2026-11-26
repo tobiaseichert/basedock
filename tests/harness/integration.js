@@ -1907,15 +1907,15 @@ async function checkSideWindows(window, side) {
  * Check that the overview reserves the side dock's maximum width and that the
  * dock stays above it as interactive chrome.
  */
-async function checkSideOverview(side) {
+async function checkSideOverview(side, bottomDots) {
     await showOverview();
     const container = dockContainer();
     const controls = Main.overview._overview._controls;
     const m = Main.layoutManager.primaryMonitor;
     const box = controls.get_allocation_box();
     const [cx] = controls.get_transformed_position();
-    check(`${side}: overview: the dock stays chrome, the stock dash takes no room`,
-        container.get_parent() === Main.layoutManager.uiGroup && stockDash().height === 0,
+    check(`${side}: overview: the dock stays chrome above the overview`,
+        container.get_parent() === Main.layoutManager.uiGroup,
         `parent=${container.get_parent()} stock dash height=${stockDash().height}`);
     // The active workspace, as the window picker shows it: as wide as its
     // height allows (workspace.js), which would reach under the dock.
@@ -1949,6 +1949,7 @@ async function checkSideOverview(side) {
     stockDash().showAppsButton.checked = true;
     await settle();
     const appDisplay = controls._appDisplay;
+    checkPageDots(side, bottomDots);
     const [gridX] = appDisplay.get_transformed_position();
     check(`${side}: app grid: centered with 112px free on both sides`,
         Math.round(appDisplay.width) === m.width - 2 * 112 &&
@@ -2051,6 +2052,19 @@ function firstFrameAfter(action) {
     });
 }
 
+function pageDotsCenter() {
+    const dots = Main.overview._overview._controls._appDisplay._pageIndicators;
+    const {origin, size} = dots.get_transformed_extents();
+    return [origin.x + size.width / 2, origin.y + size.height / 2].map(Math.round);
+}
+
+function checkPageDots(side, bottomDots) {
+    const actual = pageDotsCenter();
+    check(`${side}: app grid page dots stay at the bottom dock position`,
+        actual.every((coordinate, i) => Math.abs(coordinate - bottomDots[i]) <= 1),
+        `dots=${actual} bottom=${bottomDots}`);
+}
+
 /**
  * Move the dock to both sides and back to the bottom. Check that returning to
  * the bottom restores the overview changes made for a side dock.
@@ -2060,6 +2074,12 @@ async function testSides(window) {
     const style = controls.style;
     const appGridStyle = controls._appDisplay.style;
     window.move_resize_frame(true, 600, 300, 400, 240);
+    await settle();
+    await showOverview();
+    stockDash().showAppsButton.checked = true;
+    await settle();
+    const bottomDots = pageDotsCenter();
+    await hideOverview();
     await settle();
     for (const side of ['left', 'right']) {
         const dash = ourDash();
@@ -2076,7 +2096,7 @@ async function testSides(window) {
         await checkSideMenus(side);
         await checkSideResize(side);
         await checkSideWindows(window, side);
-        await checkSideOverview(side);
+        await checkSideOverview(side, bottomDots);
         await checkSideReorder(side);
     }
 

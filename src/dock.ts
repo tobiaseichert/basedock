@@ -96,9 +96,9 @@ const PinToEdge = GObject.registerClass({
  * overview. DockEdge handles resistance, resizing and tiling along the visible
  * inner edge.
  *
- * In the overview, the stock dash hosts a bottom dock and reserves its maximum
- * thickness so previews and app grid page dots stay in place as the dock
- * resizes. A side dock stays above the overview. OverviewRoom insets the
+ * In the overview, the stock dash hosts a bottom dock and reserves the
+ * same height at every dock position so the app grid page dots stay in place.
+ * A side dock stays above the overview, with OverviewRoom insetting the
  * workspace and app grid symmetrically.
  */
 export class Dock {
@@ -513,18 +513,15 @@ export class Dock {
         const endMargins = 2 * END_MARGIN * scaleFactor;
         if (this.#overviewRoom) {
             this.#dash.setMaxSize(maxThickness, area.height - endMargins);
-            // At a side, the centered app grid clears the dock; the stock
-            // dash takes no room at the bottom.
-            this.#stock.setHeight(0);
             this.#overviewRoom.setWidth(maxThickness);
         } else {
             this.#dash.setMaxSize(area.width - endMargins, maxThickness);
-            // Reserve the maximum thickness in the stock dash. Its height sets
-            // the overview's lower layout boundary (overviewControls.js), so a
-            // fixed height keeps previews, the grid and its page dots steady
-            // while the dock resizes.
-            this.#stock.setHeight(maxThickness);
         }
+        // overviewControls.js uses the stock dash's height as the lower
+        // layout boundary. Always reserve the maximum height of a bottom
+        // dock so resizing or moving the dock cannot shift the page dots.
+        this.#stock.setHeight(Math.min(DASH_MAX_HEIGHT * scaleFactor,
+            Math.round(monitor.height * DASH_MAX_HEIGHT_RATIO)));
         // Position and size follow from PinToEdge.
         this.#refitTiles = true;
         this.#container.queue_relayout();

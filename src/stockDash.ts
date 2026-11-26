@@ -13,9 +13,9 @@ const HOST_CLASS = 'basedock-host';
 
 /**
  * Keep the stock dash in the overview layout while baseDOCK is enabled. Hide
- * its contents and remove its Ctrl+Alt+Tab entry. A bottom dock uses it as a
- * host and as a spacer sized to the dock's maximum thickness. A side dock sets
- * its height to zero and uses OverviewRoom for clearance.
+ * its contents and remove its Ctrl+Alt+Tab entry. The stock dash reserves
+ * the maximum height of a bottom dock at every position and hosts the dock
+ * when it is at the bottom. OverviewRoom provides clearance for side docks.
  *
  * Report the dock's icon size through the stock dash. AppIcon.getDragActor()
  * in appDisplay.js reads Main.overview.dash.iconSize for drags from the dock
@@ -80,9 +80,7 @@ export class StockDashTakeover {
     }
 
     /**
-     * Set the stock dash's height in stage pixels. A bottom dock passes
-     * its maximum thickness, a side dock passes zero, and -1 unsets the
-     * explicit height.
+     * Set the overview spacer height in stage pixels.
      */
     setHeight(height: number) {
         // Only on change: setting a height queues a relayout even when it's
