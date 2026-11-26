@@ -30,15 +30,16 @@
  * reference size, dividers have 4px of grab padding on each side and an extra
  * 7px toward app and Trash icons to match the symbol's transparent margin. The
  * divider after Show Apps is adjusted to center its line between the drawn
- * icons. The running dot sits 4px from the tile toward the screen edge and is
- * 5px wide at the reference size. Background padding must leave room for it.
+ * icons. The running indicator sits 4px from the tile toward the screen edge.
+ * At the reference size, it is a 5px dot or a 15px bar for multiple windows.
+ * Background padding must leave room for its thickness.
  * The drag image reuses T, R and G.
  *
  * The normal palettes are translucent so the rounded blur in src/blur.ts
  * remains visible. Dark uses light dividers and light uses dark dividers. Both
- * use white running dots with a dark halo. High Contrast uses an opaque dark
- * fill, a solid 2px border and stronger controls. Fitting reads border widths
- * from the theme.
+ * use white running indicators with a dark halo. High Contrast uses an
+ * opaque dark fill, a solid 2px border and stronger controls. Fitting reads
+ * border widths from the theme.
  */
 
 /*
@@ -204,7 +205,7 @@
     color: #ffffff;
 }
 
-/* _styleAppIcon() positions and sizes the running dot. */
+/* dash.ts positions and sizes the running indicator. */
 #dash.basedock .dash-item-container .app-grid-running-dot {
     background-color: #ffffff;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);    /* visible on the light dock too */

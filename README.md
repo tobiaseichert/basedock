@@ -40,8 +40,9 @@ with the same command.
 | Open or empty Trash | Click **Trash** to open it in the default file manager. Its context menu offers **Empty Trash**, which asks Files to confirm the operation. If the request to Files fails, the dock opens Trash in the default file manager. |
 
 Dividers separate Show Apps, favorites, other running apps and Trash. Running
-apps have a highlighted tile and GNOME's running dot. When possible, windows
-minimize toward their app's tile and restore from it.
+apps have a highlighted tile and a running dot. A short bar marks apps with
+multiple windows, including minimized ones. When possible, windows minimize
+toward their app's tile and restore from it.
 
 If the dock gets crowded, icons shrink to keep it clear of the screen corners
 and top bar. The apps can scroll at the minimum icon size, with Show Apps and

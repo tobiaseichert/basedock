@@ -28,9 +28,10 @@ app.connect('activate', () => {
     Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(),
         provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
 
+    const first = app.get_windows().length === 0;
     const win = new Gtk.ApplicationWindow({
         application: app,
-        title: 'basedock test window',
+        title: first ? 'basedock test window' : 'basedock second test window',
         default_width: 400,
         default_height: 240,
         css_classes: ['basedock-test'],
@@ -42,7 +43,8 @@ app.connect('activate', () => {
         valign: Gtk.Align.CENTER,
     });
     win.set_child(label);
-    win.maximize();
+    if (first)
+        win.maximize();
     win.present();
 });
 app.run([]);

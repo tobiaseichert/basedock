@@ -486,18 +486,22 @@ export const BasedockDash = GObject.registerClass({
     }
 
     /**
-     * Style the running dot at g.dotGap from the tile toward the screen edge.
+     * Style the running indicator at g.dotGap from the tile toward the edge.
      * In a row, AppIcon anchors it to the icon container's bottom
      * (appDisplay.js), P plus the background border below the tile. Offset it
      * upward with _updateDotStyle().
      *
      * In a column, anchor it to the container's screen-edge side and translate
      * it toward the tile. AppIcon provides only a vertical offset. Compensate
-     * for Clutter swapping START and END in right-to-left layouts so the dot
-     * stays on the physical screen-edge side.
+     * for Clutter swapping START and END in right-to-left layouts to keep
+     * the indicator on the physical screen-edge side.
      */
     _styleAppIcon(appIcon: AppIcon, g: Geometry) {
         this._styleTile(appIcon, appIcon.icon, g);
+        this.#styleRunningIndicator(appIcon, g);
+    }
+
+    #styleRunningIndicator(appIcon: AppIcon, g: Geometry) {
         // The background's border (stylesheet.css: only with High
         // Contrast), once it's styled.
         const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
@@ -506,7 +510,12 @@ export const BasedockDash = GObject.registerClass({
             : 0;
         const offset = g.dotGap - (g.backgroundPadding + border - g.dotSize);
         const dot = appIcon._dot;
-        const size = `width: ${g.dotSize}px; height: ${g.dotSize}px; ` +
+        // Match the app menu's window list, including minimized windows.
+        const multiple = appIcon.app.get_windows().filter(window => !window.skip_taskbar).length > 1;
+        const length = multiple ? 3 * g.dotSize : g.dotSize;
+        const width = this._vertical ? g.dotSize : length;
+        const height = this._vertical ? length : g.dotSize;
+        const size = `width: ${width}px; height: ${height}px; ` +
             `border-radius: ${Math.ceil(g.dotSize / 2)}px;`;
         if (!this._vertical) {
             dot.style = `${size} offset-y: ${offset}px;`;
@@ -666,6 +675,8 @@ export const BasedockDash = GObject.registerClass({
         this.#dragWithTile(appIcon);
         this._syncRunningIcon(appIcon);
         this._styleAppIcon(appIcon, geometryAt(this.iconSize));
+        app.connectObject('windows-changed',
+            () => this.#styleRunningIndicator(appIcon, geometryAt(this.iconSize)), appIcon);
 
         const landing = this.#landing;
         if (landing?.applied && landing.app === app && !landing.appIcon) {

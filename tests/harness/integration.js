@@ -749,6 +749,56 @@ function checkRunningDot() {
         `gap=${gap} color=${color.to_string?.() ?? [color.red, color.green, color.blue]}`);
 }
 
+async function testWindowIndicator(window) {
+    const tracker = Shell.WindowTracker.get_default();
+    const dot = () => appItems().find(item => item.child?.app === tracker.get_window_app(window))?.child._dot;
+    const secondWindow = () => global.display.list_all_windows()
+        .find(w => w.get_title() === 'basedock second test window');
+    const isDot = () => dot()?.visible && dot().width > 0 && dot().width === dot().height;
+    check('window indicator: a single window has a dot', isDot());
+
+    // Activate the existing GTK fixture on the private session bus to open
+    // another window belonging to the same application.
+    await new Promise((resolve, reject) => {
+        Gio.DBus.session.call('org.basedock.TestWindow', '/org/basedock/TestWindow',
+            'org.gtk.Application', 'Activate', new GLib.Variant('(a{sv})', [{}]), null,
+            Gio.DBusCallFlags.NO_AUTO_START, 5000, null, (connection, result) => {
+                try {
+                    connection.call_finish(result);
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            });
+    });
+    const second = await waitFor(secondWindow, 5000);
+    try {
+        const grouped = second && await waitFor(() =>
+            tracker.get_window_app(window) === tracker.get_window_app(second), 5000);
+        check('window indicator: both windows belong to the same app', grouped);
+        if (!grouped)
+            return;
+        check('window indicator: opening a second window changes the dot to a bar',
+            await waitFor(() => dot()?.width > dot()?.height, 5000));
+        second.minimize();
+        for (const side of ['bottom', 'left', 'right']) {
+            settings().set_string('position', side);
+            await settle();
+            const indicator = dot();
+            check(`${side}: the bar follows the dock and includes the minimized window`,
+                second.minimized && indicator?.visible && (side === 'bottom'
+                    ? indicator.width > indicator.height : indicator.height > indicator.width),
+                `indicator=${indicator?.width}×${indicator?.height}`);
+        }
+    } finally {
+        settings().set_string('position', 'bottom');
+        second?.delete(global.get_current_time());
+        await waitFor(() => !secondWindow(), 5000);
+        await settle();
+    }
+    check('window indicator: closing the second window restores the dot', isDot());
+}
+
 /** Trash: a tile's footprint, and its icon follows the trash's state. */
 async function testTrash() {
     const dash = ourDash();
@@ -2424,6 +2474,7 @@ async function main() {
 
     // The dock at the left and the right edge, then back at the bottom.
     await testSides(window);
+    await testWindowIndicator(window);
     await checkInterruptedDrag();
 
     // Try teardown while Shell still owns the open popup's grab.
