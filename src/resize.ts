@@ -24,13 +24,14 @@ export interface ResizeTarget {
  * border. Drag up to grow and down to shrink at any dock position. The target
  * maps vertical displacement to a size within its limits.
  *
- * Clutter.PanGesture, also used in slider.js, follows pointer and touch drags
- * outside the actor. Recognize the press immediately so resizing starts with
- * the first pixel of movement.
+ * Like GNOME Shell's slider in js/ui/slider.js, grab the stage for the
+ * recognized pan so motion and release keep reaching the grip when the
+ * pointer crosses a window or the dock moves under it.
  */
 export class ResizeDrag {
     readonly #target: ResizeTarget;
     readonly #gesture: Clutter.PanGesture;
+    #grab: Clutter.Grab | null = null;
     #grow = 0;
 
     constructor(actor: Clutter.Actor, target: ResizeTarget) {
@@ -44,22 +45,30 @@ export class ResizeDrag {
             required_button: Clutter.BUTTON_PRIMARY,
         });
         this.#gesture.set_begin_threshold(0);
-        this.#gesture.connect('recognize', () => this.#onBegin());
+        this.#gesture.connect('recognize', () => this.#onBegin(actor));
         this.#gesture.connect('pan-update', () => this.#onUpdate());
         // Cancelled (e.g. another grab took over): keep the size reached,
         // so the dock isn't left mid-drag.
         this.#gesture.connect('end', () => this.#onEnd());
         this.#gesture.connect('cancel', () => this.#onEnd());
         actor.add_action(this.#gesture);
+        actor.connect('notify::mapped', () => {
+            if (!actor.mapped)
+                this.#onEnd();
+        });
     }
 
-    #onBegin() {
+    #onBegin(actor: Clutter.Actor) {
         const {x, y} = this.#gesture.get_begin_centroid_abs();
         this.#grow = 0;
+        this.#grab = global.stage.grab_inactive(actor);
         this.#target.beginResize(x, y);
+        this.#grab?.activate();
     }
 
     #onUpdate() {
+        if (!this.#grab)
+            return;
         const delta = this.#gesture.get_accumulated_delta_abs();
         const grow = -delta.get_y();
         if (grow !== this.#grow) {
@@ -69,7 +78,15 @@ export class ResizeDrag {
     }
 
     #onEnd() {
-        this.#target.commitResize(this.#grow);
+        const grab = this.#grab;
+        if (!grab)
+            return;
+        this.#grab = null;
+        try {
+            this.#target.commitResize(this.#grow);
+        } finally {
+            grab.dismiss();
+        }
     }
 }
 

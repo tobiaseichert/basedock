@@ -1081,6 +1081,41 @@ async function dragHandle(handle, dy, onMidway = () => {}) {
     await settle();
 }
 
+/** Leave the dock, reverse direction, and release outside it in one drag. */
+async function checkResizeOutsideGrip(grip, dy) {
+    const dash = ourDash();
+    const side = dash._side;
+    const start = dash.iconSize;
+    const saved = settings().get_int('icon-size');
+    const previousGrab = global.stage.get_grab_actor();
+    const [gx, gy] = grip.get_transformed_position();
+    const x = Math.round(gx + grip.width / 2);
+    const y = Math.round(gy + grip.height / 2);
+    const monitor = Main.layoutManager.primaryMonitor;
+    const outsideX = Math.round(monitor.x + monitor.width * 0.75);
+    const pointer = await sharedPointer();
+    await pointer.moveTo(x, y);
+    await pointer.press();
+    try {
+        const sizes = [];
+        let held = global.stage.get_grab_actor() === grip;
+        for (const offset of [0, dy, dy / 2, dy]) {
+            await pointer.moveTo(outsideX, y + offset);
+            sizes.push(dash.iconSize);
+            held &&= global.stage.get_grab_actor() === grip;
+        }
+        check(`${side}: a resize drag keeps receiving motion outside the dock`,
+            held && sizes.join(',') === [start, start - dy, start - dy / 2, start - dy].join(',') &&
+                settings().get_int('icon-size') === saved, `held=${held} sizes=${sizes}`);
+    } finally {
+        await pointer.release();
+    }
+    check(`${side}: releasing outside the dock saves the size and drops the grab`,
+        global.stage.get_grab_actor() === previousGrab && dash.iconSize === start - dy &&
+            settings().get_int('icon-size') === dash.iconSize);
+    await settle();
+}
+
 // App icons are the icon size plus G (src/geometry.ts): they grow into
 // their tile's padding, the tile keeps its footprint F.
 const iconGrow = size => geometryAt(size).iconGrow;
@@ -1736,7 +1771,7 @@ async function checkEdgeGrip() {
         `grip=${JSON.stringify(grip)} background=${JSON.stringify(bg)}`);
 
     const start = dash.iconSize;
-    await dragHandle(dash._edgeGrip, -8);
+    await checkResizeOutsideGrip(dash._edgeGrip, -8);
     check('resize: dragging the top border resizes the dock',
         dash.iconSize > start && settings().get_int('icon-size') === dash.iconSize,
         `iconSize=${dash.iconSize}`);
@@ -2065,7 +2100,7 @@ async function checkSideResize(side) {
     check(`${side}: dragging a divider up grows the icons`,
         ourDash().iconSize === 56 && settings().get_int('icon-size') === 56,
         `iconSize=${ourDash().iconSize} setting=${settings().get_int('icon-size')}`);
-    await dragActorBy(ourDash()._edgeGrip, 0, 8);
+    await checkResizeOutsideGrip(ourDash()._edgeGrip, 8);
     check(`${side}: dragging the inner border down shrinks the icons`,
         ourDash().iconSize === 48 && settings().get_int('icon-size') === 48,
         `iconSize=${ourDash().iconSize} setting=${settings().get_int('icon-size')}`);
