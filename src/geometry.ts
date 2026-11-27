@@ -49,8 +49,8 @@ export type Geometry = typeof REFERENCE & {
  * end padding (P - S). This avoids jumps when several individual lengths
  * would otherwise round up together.
  *
- * Keep the running dot at least 2px wide and leave enough padding for the dot
- * and its gap to the tile.
+ * Keep window dots at least 2px wide. The background padding leaves room
+ * for the dot, its gap to the tile and a pixel clear of the background edge.
  */
 export function geometryAt(size: number): Geometry {
     const scale = size / DEFAULT_ICON_SIZE;

@@ -40,11 +40,13 @@ with the same command.
 | Open or empty Trash | Click **Trash** to open it in the default file manager. Its context menu offers **Empty Trash**, which asks Files to confirm the operation. If the request to Files fails, the dock opens Trash in the default file manager. |
 
 Dividers separate Show Apps, favorites, other running apps and Trash. Running
-apps have a highlighted tile and a running dot. A short bar marks apps with
-multiple windows, including minimized ones. Click an app icon to focus the
-app. Once it has focus, click its icon again to cycle through its windows,
-restoring any minimized window you reach. When possible, windows minimize
-toward their app's tile and restore from it.
+apps have a highlighted tile and one mark per window. The focused window has
+a white dot, other visible windows have gray dots, and minimized windows have
+gray lines. A bar takes over if the marks would exceed the tile. Click an app
+icon to focus the app. Once it has focus, click its icon again to cycle through
+its visible windows in indicator order. To restore a specific minimized window,
+right-click the icon and choose the window under **Open Windows**. When
+possible, windows minimize toward their app's tile and restore from it.
 
 If the dock gets crowded, icons shrink to keep it clear of the screen corners
 and top bar. The apps can scroll at the minimum icon size, with Show Apps and
@@ -178,6 +180,7 @@ starting points for common extension tasks.
 | Reuse directional layout and implement Mutter window constraints | [`side.ts`](src/side.ts), [`dockEdge.ts`](src/dockEdge.ts) |
 | Blur moving content with Clutter clones and a rounded shader mask | [`blur.ts`](src/blur.ts) |
 | Scale spacing and radii, and cross-fade an St palette change | [`geometry.ts`](src/geometry.ts), [`dockStyle.ts`](src/dockStyle.ts), [`stylesheet.css`](stylesheet.css) |
+| Keep window indicators aligned as focus changes | [`windowIndicator.ts`](src/windowIndicator.ts) |
 | Package a GSettings schema and a symbolic icon | [`schemas/`](schemas/), [`icons/`](icons/), [`pack.sh`](scripts/pack.sh) |
 
 ### Layout

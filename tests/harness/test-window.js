@@ -5,6 +5,7 @@
 // stripes make blur and translucency easy to compare, and it restores to
 // 400×240 so it can sit beside the dock.
 import Gdk from 'gi://Gdk?version=4.0';
+import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk?version=4.0';
 
 const CSS = `
@@ -22,6 +23,16 @@ label.basedock-test {
 `;
 
 const app = new Gtk.Application({application_id: 'org.basedock.TestWindow'});
+const transient = new Gio.SimpleAction({name: 'toggle-transient'});
+transient.connect('activate', () => {
+    const windows = app.get_windows();
+    const child = windows.find(w => w.title === 'basedock third test window');
+    const parent = windows.find(w => w.title === 'basedock test window');
+    const attached = child.get_transient_for() !== null;
+    child.set_transient_for(attached ? null : parent);
+    child.set_modal(!attached);
+});
+app.add_action(transient);
 app.connect('activate', () => {
     const provider = new Gtk.CssProvider();
     provider.load_from_string(CSS);

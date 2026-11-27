@@ -733,7 +733,11 @@ function checkRunningTile() {
         `start=${start?.alpha} end=${end?.alpha}`);
 }
 
-/** Running dots: white, 4px below the tile. */
+function windowDots(indicator) {
+    return indicator?.get_children().map(slot => slot.get_first_child()) ?? [];
+}
+
+/** The running indicator reserves a 4px gap between its slots and the tile. */
 function checkRunningDot() {
     const appIcon = appItems().map(i => i.child).find(c => c._dot.visible);
     if (!appIcon) {
@@ -743,18 +747,17 @@ function checkRunningDot() {
     const [, tileY] = appIcon.icon.get_transformed_position();
     const [, dotY] = appIcon._dot.get_transformed_position();
     const gap = Math.round(dotY - tileY - appIcon.icon.height);
-    const color = appIcon._dot.get_theme_node().get_background_color();
-    check('running dot: white, 4px below the tile',
-        gap === 4 && color.red === 255 && color.green === 255 && color.blue === 255,
-        `gap=${gap} color=${color.to_string?.() ?? [color.red, color.green, color.blue]}`);
+    const color = windowDots(appIcon._dot)[0]?.get_theme_node().get_background_color();
+    const expected = appIcon.app.get_windows().includes(global.display.focus_window) ? 255 : 166;
+    check('running dot: neutral color and 4px below the tile',
+        gap === 4 && color?.red === expected && color.green === expected && color.blue === expected,
+        `gap=${gap} color=${color?.to_string()}`);
 }
 
-async function openTestAppWindow(title) {
-    // Activate the existing GTK fixture on the private session bus to open
-    // another window belonging to the same application.
-    await new Promise((resolve, reject) => {
+function callTestApp(iface, method, parameters) {
+    return new Promise((resolve, reject) => {
         Gio.DBus.session.call('org.basedock.TestWindow', '/org/basedock/TestWindow',
-            'org.gtk.Application', 'Activate', new GLib.Variant('(a{sv})', [{}]), null,
+            iface, method, parameters, null,
             Gio.DBusCallFlags.NO_AUTO_START, 5000, null, (connection, result) => {
                 try {
                     connection.call_finish(result);
@@ -764,6 +767,12 @@ async function openTestAppWindow(title) {
                 }
             });
     });
+}
+
+async function openTestAppWindow(title) {
+    // Activate the existing GTK fixture on the private session bus to open
+    // another window belonging to the same application.
+    await callTestApp('org.gtk.Application', 'Activate', new GLib.Variant('(a{sv})', [{}]));
     return waitFor(() => global.display.list_all_windows()
         .find(window => window.get_title() === title), 5000);
 }
@@ -773,7 +782,7 @@ async function testWindowIndicator(window) {
     const dot = () => appItems().find(item => item.child?.app === tracker.get_window_app(window))?.child._dot;
     const secondWindow = () => global.display.list_all_windows()
         .find(w => w.get_title() === 'basedock second test window');
-    const isDot = () => dot()?.visible && dot().width > 0 && dot().width === dot().height;
+    const isDot = () => dot()?.visible && windowDots(dot()).length === 1;
     check('window indicator: a single window has a dot', isDot());
 
     const second = await openTestAppWindow('basedock second test window');
@@ -783,17 +792,45 @@ async function testWindowIndicator(window) {
         check('window indicator: both windows belong to the same app', grouped);
         if (!grouped)
             return;
-        check('window indicator: opening a second window changes the dot to a bar',
-            await waitFor(() => dot()?.width > dot()?.height, 5000));
-        second.minimize();
+        check('window indicator: opening a second window adds a dot',
+            await waitFor(() => windowDots(dot()).length === 2, 5000));
+        const centers = dots => dots.map(actor => {
+            const {origin, size} = actor.get_transformed_extents();
+            return [origin.x + size.width / 2, origin.y + size.height / 2];
+        });
         for (const side of ['bottom', 'left', 'right']) {
             settings().set_string('position', side);
+            second.minimize();
             await settle();
-            const indicator = dot();
-            check(`${side}: the bar follows the dock and includes the minimized window`,
-                second.minimized && indicator?.visible && (side === 'bottom'
-                    ? indicator.width > indicator.height : indicator.height > indicator.width),
-                `indicator=${indicator?.width}×${indicator?.height}`);
+            window.activate(global.get_current_time());
+            await settle();
+
+            const dots = windowDots(dot());
+            const start = centers(dots);
+            const axis = side === 'bottom' ? 0 : 1;
+            const across = 1 - axis;
+            const colors = dots.map(actor => actor.get_theme_node().get_background_color().red);
+            const [alongScale, acrossScale] = side === 'bottom' ? ['scale_x', 'scale_y'] : ['scale_y', 'scale_x'];
+            check(`${side}: the focused window has a white dot and the minimized window a gray line`,
+                dots.length === 2 && second.minimized && colors[0] === 255 && colors[1] === 166 &&
+                dots[0].scale_x === 1 && dots[0].scale_y === 1 &&
+                dots[1][alongScale] === 1 && dots[1][acrossScale] < 1 &&
+                start[1][axis] > start[0][axis] && Math.abs(start[1][across] - start[0][across]) <= 0.5,
+                `dots=${start} colors=${colors} across scales=${dots.map(actor => actor[acrossScale])}`);
+
+            second.unminimize();
+            second.activate(global.get_current_time());
+            await settle();
+            const updated = windowDots(dot());
+            const end = centers(updated);
+            const updatedColors = updated.map(actor => actor.get_theme_node().get_background_color().red);
+            check(`${side}: restoring and focusing a window changes the marks without moving them`,
+                global.display.focus_window === second && updated.length === 2 &&
+                updated.every(actor => actor.scale_x === 1 && actor.scale_y === 1 &&
+                    actor.width === actor.height && actor.width === updated[0].width) &&
+                updatedColors[0] === colors[1] && updatedColors[1] === 255 &&
+                end.every((center, i) => center.every((value, j) => Math.abs(value - start[i][j]) <= 0.01)),
+                `before=${start} after=${end} colors=${updatedColors}`);
         }
     } finally {
         settings().set_string('position', 'bottom');
@@ -804,7 +841,51 @@ async function testWindowIndicator(window) {
     check('window indicator: closing the second window restores the dot', isDot());
 }
 
-/** Use real dock clicks to cycle three windows, one of which starts minimized. */
+async function testTransientWindowIndicator(window) {
+    const tracker = Shell.WindowTracker.get_default();
+    const icon = () => appItems().find(item => item.child?.app === tracker.get_window_app(window))?.child;
+    const dots = () => windowDots(icon()?._dot);
+    const toggleTransient = () => callTestApp('org.gtk.Actions', 'Activate',
+        new GLib.Variant('(sava{sv})', ['toggle-transient', [], {}]));
+    const second = await openTestAppWindow('basedock second test window');
+    let third;
+    try {
+        third = await openTestAppWindow('basedock third test window');
+        const ready = second && third && await waitFor(() => dots().length === 3, 5000);
+        check('transient indicator: three eligible windows start with three dots', ready);
+        if (!ready)
+            return;
+
+        await toggleTransient();
+        check('transient indicator: an existing window drops its dot when it skips the taskbar',
+            await waitFor(() => third.skip_taskbar && dots().length === 2, 5000),
+            `skip=${third.skip_taskbar} dots=${dots().length}`);
+        // Reach the dialog through its parent with a real user timestamp.
+        for (let i = 0; i < 2 && global.display.focus_window !== third; i++)
+            await dragActorBy(icon(), 0, 0);
+        const colors = dots().map(dot => dot.get_theme_node().get_background_color().red);
+        check('transient indicator: the parent dot is white while its dialog has focus',
+            global.display.focus_window === third && colors[0] === 255 && colors[1] === 166,
+            `focus=${global.display.focus_window?.get_title()} colors=${colors}`);
+
+        await dragActorBy(icon(), 0, 0);
+        check('transient indicator: a click cycles from the parent to the next window',
+            global.display.focus_window === second,
+            `focus=${global.display.focus_window?.get_title()}`);
+
+        await toggleTransient();
+        check('transient indicator: the dot returns when the window rejoins the taskbar',
+            await waitFor(() => !third.skip_taskbar && dots().length === 3, 5000),
+            `skip=${third.skip_taskbar} dots=${dots().length}`);
+    } finally {
+        second?.delete(global.get_current_time());
+        third?.delete(global.get_current_time());
+        await waitFor(() => !global.display.list_all_windows().some(w => w === second || w === third), 5000);
+        await settle();
+    }
+}
+
+/** Use real dock clicks to cycle windows and leave minimized ones parked. */
 async function testWindowCycle(window) {
     const tracker = Shell.WindowTracker.get_default();
     const icon = () => appItems().find(item => item.child?.app === tracker.get_window_app(window))?.child;
@@ -818,9 +899,12 @@ async function testWindowCycle(window) {
         if (!grouped)
             return;
 
+        const order = [window, second, third];
+        const next = focused => order[(order.indexOf(focused) + 1) % order.length];
         for (const side of ['bottom', 'left', 'right']) {
             settings().set_string('position', side);
-            second.minimize();
+            for (const appWindow of order)
+                appWindow.unminimize();
             await settle();
             window.activate(global.get_current_time());
             await settle();
@@ -832,12 +916,39 @@ async function testWindowCycle(window) {
                 await dragActorBy(icon(), 0, 0);
                 focused.push(global.display.focus_window);
             }
-            check(`${side}: clicks visit both other windows and wrap to the start`,
-                [window, second, third].includes(initial) &&
-                [window, second, third].filter(w => w !== initial)
-                    .every(w => focused.slice(0, 2).includes(w)) &&
+            check(`${side}: clicks advance in indicator order and wrap to the start`,
+                order.includes(initial) && focused[0] === next(initial) && focused[1] === next(focused[0]) &&
                 focused[2] === initial && !second.minimized && !icon()._menu?.isOpen,
                 `initial=${initial?.get_title()} focus order=${focused.map(w => w?.get_title()).join(', ')}`);
+
+            await dragActorBy(icon(), 0, 0);
+            const minimized = global.display.focus_window;
+            minimized?.minimize();
+            await settle();
+            const before = global.display.focus_window;
+            await dragActorBy(icon(), 0, 0);
+            const after = global.display.focus_window;
+            const visible = order.filter(w => w !== minimized);
+            check(`${side}: minimizing a window skips it without changing indicator order`,
+                order.includes(minimized) && minimized.minimized && visible.includes(before) &&
+                after === visible[(visible.indexOf(before) + 1) % visible.length],
+                `minimized=${minimized?.get_title()} before=${before?.get_title()} after=${after?.get_title()}`);
+
+            if (side === 'bottom') {
+                before?.minimize();
+                await settle();
+                await dragActorBy(icon(), 0, 0);
+                check('window cycle: clicking with just one visible window leaves both others minimized',
+                    global.display.focus_window === after && minimized?.minimized && before?.minimized);
+
+                await rightClick(icon());
+                const entry = icon()._menu?._windowSection._getMenuItems()
+                    .find(item => item.label.text === minimized?.get_title());
+                if (entry)
+                    await dragActorBy(entry, 0, 0);
+                check('window cycle: Open Windows restores the parked window',
+                    entry && !minimized.minimized && global.display.focus_window === minimized);
+            }
         }
     } finally {
         settings().set_string('position', 'bottom');
@@ -1211,11 +1322,12 @@ async function testLightDock() {
     check('light dock: the Default style makes it light', isLight());
     const line = ourDash()._separatorHandle.line.get_theme_node().get_background_color();
     const symbol = ourDash()._showAppsIcon._iconActor.get_theme_node().get_foreground_color();
-    const dot = appItems().map(i => i.child).find(c => c._dot.visible)
-        ?._dot.get_theme_node().get_background_color();
-    check('light dock: dark dividers, white Show Apps symbol and running dots',
+    const appIcon = appItems().map(i => i.child).find(c => c._dot.visible);
+    const dot = windowDots(appIcon?._dot)[0]?.get_theme_node().get_background_color();
+    const expectedDot = appIcon?.app.get_windows().includes(global.display.focus_window) ? 255 : 166;
+    check('light dock: dark dividers, white Show Apps symbol and neutral window dots',
         line.red === 0 && line.alpha > 0 && symbol.red === 255 && symbol.green === 255 &&
-        dot?.red === 255 && dot?.green === 255 && dot?.blue === 255 && dot?.alpha === 255,
+        dot?.red === expectedDot && dot.green === expectedDot && dot.blue === expectedDot && dot.alpha === 255,
         `line ${line.to_string()} symbol ${symbol.to_string()} dot ${dot?.to_string()}`);
 
     const shown = once(Main.overview, 'shown');
@@ -2529,6 +2641,7 @@ async function main() {
     // The dock at the left and the right edge, then back at the bottom.
     await testSides(window);
     await testWindowIndicator(window);
+    await testTransientWindowIndicator(window);
     await testWindowCycle(window);
     await checkInterruptedDrag();
 

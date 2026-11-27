@@ -31,15 +31,16 @@
  * 7px toward app and Trash icons to match the symbol's transparent margin. The
  * divider after Show Apps is adjusted to center its line between the drawn
  * icons. The running indicator sits 4px from the tile toward the screen edge.
- * At the reference size, it is a 5px dot or a 15px bar for multiple windows.
- * Background padding must leave room for its thickness.
+ * At the reference size, each window has a 5px slot. A minimized window
+ * uses a 2px line along the dock in that slot. A 15px bar replaces the
+ * indicators if the row exceeds the tile.
  * The drag image reuses T, R and G.
  *
  * The normal palettes are translucent so the rounded blur in src/blur.ts
  * remains visible. Dark uses light dividers and light uses dark dividers. Both
- * use white running indicators with a dark halo. High Contrast uses an
- * opaque dark fill, a solid 2px border and stronger controls. Fitting reads
- * border widths from the theme.
+ * use white focused dots and gray marks for other windows, with a dark
+ * halo. High Contrast uses an opaque dark fill, a solid 2px border and
+ * stronger controls. Fitting reads border widths from the theme.
  */
 
 /*
@@ -205,10 +206,24 @@
     color: #ffffff;
 }
 
-/* dash.ts positions and sizes the running indicator. */
+/* Shell keeps the indicator host visible according to the app state. */
 #dash.basedock .dash-item-container .app-grid-running-dot {
-    background-color: #ffffff;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+#dash.basedock .dash-item-container .basedock-window-dot,
+#dash.basedock .dash-item-container .app-grid-running-dot.basedock-window-indicator-overflow {
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);    /* visible on the light dock too */
+}
+
+#dash.basedock .dash-item-container .basedock-window-dot {
+    background-color: #a6a6a6;
+}
+
+#dash.basedock .dash-item-container .basedock-window-dot.basedock-window-dot-focused,
+#dash.basedock .dash-item-container .app-grid-running-dot.basedock-window-indicator-overflow {
+    background-color: #ffffff;
 }
 
 /*

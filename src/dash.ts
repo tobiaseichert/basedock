@@ -26,6 +26,7 @@ import {ResizeDrag, ResizeHandle, type ResizeTarget} from './resize.js';
 import {isVertical, orientationOf, stSide, type DockSide} from './side.js';
 import {ChildSlider} from './slide.js';
 import {TrashIcon} from './trash.js';
+import {focusedTaskbarWindow, taskbarWindows, WindowIndicator} from './windowIndicator.js';
 
 // Use the stock dash's DASH_ANIMATION_TIME for item slides and drop
 // animations.
@@ -43,9 +44,6 @@ const UNMATCHED_APP_DELAY_MS = 1000;
 
 // Style class that highlights the tile of a running app.
 const RUNNING_CLASS = 'basedock-running';
-
-// Follow the app menu in appMenu.js, including minimized windows.
-const appWindows = (app: Shell.App) => app.get_windows().filter(window => !window.skip_taskbar);
 
 // Match DASH_ITEM_LABEL_SHOW_TIME in dash.js when fading in tooltips.
 const LABEL_SHOW_TIME = 150;
@@ -187,6 +185,7 @@ export const BasedockDash = GObject.registerClass({
      * created.
      */
     declare _windowsSince: WeakMap<Meta.Window, number>;
+    declare _windowIndicators: WeakMap<AppIcon, WindowIndicator>;
     declare _unmatchedTimeoutId: number;
     /** Pending fit scheduled after layout and before the next frame. */
     declare _refitLaterId: number;
@@ -223,6 +222,7 @@ export const BasedockDash = GObject.registerClass({
         this._preferredIconSize = DEFAULT_ICON_SIZE;
         this._settings = null;
         this._windowsSince = new WeakMap();
+        this._windowIndicators = new WeakMap();
         this._unmatchedTimeoutId = 0;
         this._growLimit = () => Infinity;
         this._targetIconSize = 0;
@@ -264,8 +264,14 @@ export const BasedockDash = GObject.registerClass({
 
         // Style running tiles with a class because St's :active state tracks a
         // press.
-        global.display.connectObject('window-created', (_display: Meta.Display, window: Meta.Window) =>
-            this._windowsSince.set(window, GLib.get_monotonic_time() / 1000), this);
+        global.display.connectObject(
+            'window-created', (_display: Meta.Display, window: Meta.Window) =>
+                this._windowsSince.set(window, GLib.get_monotonic_time() / 1000),
+            'notify::focus-window', () => {
+                const focused = focusedTaskbarWindow();
+                for (const icon of this._appIcons())
+                    this._windowIndicators.get(icon)?.syncFocus(focused);
+            }, this);
         Shell.AppSystem.get_default().connectObject(
             'app-state-changed', () => this._syncRunning(), this);
 
@@ -511,19 +517,16 @@ export const BasedockDash = GObject.registerClass({
         const border = this._background.get_stage()
             ? this._background.get_theme_node().get_border_width(stSide(this._side)) / scaleFactor
             : 0;
-        const offset = g.dotGap - (g.backgroundPadding + border - g.dotSize);
         const dot = appIcon._dot;
-        const multiple = appWindows(appIcon.app).length > 1;
-        const length = multiple ? 3 * g.dotSize : g.dotSize;
-        const width = this._vertical ? g.dotSize : length;
-        const height = this._vertical ? length : g.dotSize;
-        const size = `width: ${width}px; height: ${height}px; ` +
-            `border-radius: ${Math.ceil(g.dotSize / 2)}px;`;
+        this._windowIndicators.get(appIcon)!
+            .update(appIcon.app.get_windows(), this.iconSize, g, scaleFactor);
+        const offset = g.dotGap - (g.backgroundPadding + border - g.dotSize);
+        const radius = `border-radius: ${Math.ceil(g.dotSize / 2)}px;`;
         if (!this._vertical) {
-            dot.style = `${size} offset-y: ${offset}px;`;
+            dot.style = `${radius} offset-y: ${offset}px;`;
             return;
         }
-        dot.style = `${size} offset-y: 0;`;
+        dot.style = `${radius} offset-y: 0;`;
         const rtl = dot.get_text_direction() === Clutter.TextDirection.RTL;
         dot.x_align = (this._side === 'left') !== rtl
             ? Clutter.ActorAlign.START : Clutter.ActorAlign.END;
@@ -539,6 +542,11 @@ export const BasedockDash = GObject.registerClass({
         this._edgeGrip = new St.Widget({name: 'basedock-edge-grip'});
         const placement = new EdgeGripPlacement();
         placement._background = this._background;
+        // DashItemContainer's destroy handler in dash.js can trigger an
+        // allocation after the background is destroyed.
+        this._background.connectObject('destroy', () => {
+            placement._background = null;
+        }, this._edgeGrip);
         placement._side = this._side;
         // Half the background's padding: clear of the icons' tiles.
         placement._thickness = () =>
@@ -676,10 +684,12 @@ export const BasedockDash = GObject.registerClass({
         followIconGrow(appIcon.icon, size => geometryAt(size).iconGrow);
         this.#dragWithTile(appIcon);
         this.#cycleAppWindows(appIcon);
+        const refreshIndicator = () => this.#styleRunningIndicator(appIcon, geometryAt(this.iconSize));
+        this._windowIndicators.set(appIcon,
+            new WindowIndicator(appIcon._dot, this._vertical, refreshIndicator));
         this._syncRunningIcon(appIcon);
         this._styleAppIcon(appIcon, geometryAt(this.iconSize));
-        app.connectObject('windows-changed',
-            () => this.#styleRunningIndicator(appIcon, geometryAt(this.iconSize)), appIcon);
+        app.connectObject('windows-changed', refreshIndicator, appIcon);
 
         const landing = this.#landing;
         if (landing?.applied && landing.app === app && !landing.appIcon) {
@@ -702,41 +712,24 @@ export const BasedockDash = GObject.registerClass({
     /**
      * Wrap AppIcon.activate() (appDisplay.js) on this dock item only.
      * Keep GNOME's launch and focus behavior until one of the app's windows
-     * has focus. Freeze the cycle order so activating a window does not
-     * move it to the front and cause repeated clicks to alternate a pair.
+     * has focus, then advance through its visible windows in indicator order.
      */
     #cycleAppWindows(icon: AppIcon) {
         const activate = icon.activate.bind(icon);
-        // Keep IDs so a pinned icon cannot retain closed windows.
-        const windowId = (window: Meta.Window) => window.get_stable_sequence();
-        let order: number[] = [];
-        let lastActivated: number | null = null;
-
         icon.activate = button => {
             const event = Clutter.get_current_event();
             const modifiers = event?.get_state() ?? 0;
-            const focused = global.display.focus_window;
-            const windows = appWindows(icon.app);
+            const focused = focusedTaskbarWindow();
+            const windows = taskbarWindows(icon.app.get_windows());
+            const visible = windows.filter(window => !window.minimized);
+            const index = focused ? visible.indexOf(focused) : -1;
             if (button !== Clutter.BUTTON_PRIMARY || (modifiers & Clutter.ModifierType.CONTROL_MASK) ||
-                windows.length < 2 || !focused || !windows.includes(focused)) {
-                order = [];
-                lastActivated = null;
+                windows.length < 2 || index < 0) {
                 activate(button);
                 return;
             }
-
-            const focusedId = windowId(focused);
-            const byId = new Map(windows.map(window => [windowId(window), window]));
-            if (focusedId !== lastActivated || windows.length !== order.length ||
-                order.some(id => !byId.has(id))) {
-                const workspace = global.workspace_manager.get_active_workspace();
-                // Keep Shell's order within each group, starting on this workspace.
-                order = windows.sort((a, b) =>
-                    Number(b.located_on_workspace(workspace)) - Number(a.located_on_workspace(workspace)))
-                    .map(windowId);
-            }
-            lastActivated = order[(order.indexOf(focusedId) + 1) % order.length];
-            Main.activateWindow(byId.get(lastActivated)!, event?.get_time() ?? global.get_current_time());
+            const next = visible[(index + 1) % visible.length];
+            Main.activateWindow(next, event?.get_time() ?? global.get_current_time());
         };
     }
 
