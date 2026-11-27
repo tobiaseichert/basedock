@@ -41,7 +41,7 @@ app.connect('activate', () => {
 
     const count = app.get_windows().length;
     const title = ['basedock test window', 'basedock second test window',
-        'basedock third test window'][count] ?? 'basedock additional test window';
+        'basedock third test window'][count] ?? `basedock test window ${count + 1}`;
     const win = new Gtk.ApplicationWindow({
         application: app,
         title,

@@ -36,6 +36,8 @@ const REFERENCE = {
 };
 
 export type Geometry = typeof REFERENCE & {
+    /** Space between window marks along the dock. */
+    dotSpacing: number;
     /** Extra space beyond the icon size in a tile's footprint (2T + G). */
     footprint: number;
     /** P - S: the background's padding at the dock's ends. */
@@ -73,10 +75,31 @@ export function geometryAt(size: number): Geometry {
         handlePadding: px(REFERENCE.handlePadding),
         dotSize,
         dotGap,
+        dotSpacing: Math.round(dotSize / 2),
         footprint: 2 * tilePadding + iconGrow,
         endPadding,
         backgroundRadius: px(REFERENCE.backgroundRadius),
     };
+}
+
+// Rounded dots and gaps can jump in size before the tile catches up. Use
+// the tightest fit at this or any larger size so shrinking the dock can
+// replace dots with a bar once, without bringing the dots back.
+const windowDotCapacities = (() => {
+    const capacities: number[] = [];
+    let capacity = Infinity;
+    for (let size = MAX_ICON_SIZE; size >= MIN_ICON_SIZE; size--) {
+        const {dotSize, dotSpacing, footprint} = geometryAt(size);
+        const fit = Math.floor((size + footprint + dotSpacing) / (dotSize + dotSpacing));
+        capacity = Math.min(capacity, fit);
+        capacities[size - MIN_ICON_SIZE] = capacity;
+    }
+    return capacities;
+})();
+
+/** The maximum number of individual marks at a supported icon size. */
+export function windowDotCapacity(size: number): number {
+    return windowDotCapacities[size - MIN_ICON_SIZE];
 }
 
 /**

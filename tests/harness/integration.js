@@ -814,7 +814,7 @@ async function testWindowIndicator(window) {
             check(`${side}: the focused window has a white dot and the minimized window a gray line`,
                 dots.length === 2 && second.minimized && colors[0] === 255 && colors[1] === 166 &&
                 dots[0].scale_x === 1 && dots[0].scale_y === 1 &&
-                dots[1][alongScale] === 1 && dots[1][acrossScale] < 1 &&
+                dots[1][alongScale] === 1 && dots[1][acrossScale] === 0.5 &&
                 start[1][axis] > start[0][axis] && Math.abs(start[1][across] - start[0][across]) <= 0.5,
                 `dots=${start} colors=${colors} across scales=${dots.map(actor => actor[acrossScale])}`);
 
@@ -839,6 +839,55 @@ async function testWindowIndicator(window) {
         await settle();
     }
     check('window indicator: closing the second window restores the dot', isDot());
+}
+
+async function testWindowIndicatorOverflow(window) {
+    const tracker = Shell.WindowTracker.get_default();
+    const app = tracker.get_window_app(window);
+    const indicator = () => appItems().find(item => item.child?.app === app)?.child._dot;
+    const windows = [];
+    try {
+        for (const title of ['basedock second test window', 'basedock third test window',
+            'basedock test window 4', 'basedock test window 5', 'basedock test window 6',
+            'basedock test window 7']) {
+            const opened = await openTestAppWindow(title);
+            if (!opened)
+                throw new Error(`could not open ${title}`);
+            windows.push(opened);
+        }
+        for (const side of ['bottom', 'left', 'right']) {
+            settings().set_string('position', side);
+            await waitFor(() => ourDash()?._side === side && windowDots(indicator()).length === 7, 5000, 20);
+            const dash = ourDash();
+            const start = dash.iconSize;
+            dash.beginResize(0, 0);
+            try {
+                const samples = [];
+                for (const size of [27, 26, 23, 16]) {
+                    dash.previewResize(size - start);
+                    const resized = await waitFor(() => dash.iconSize === size, 1000, 20);
+                    const host = indicator();
+                    if (!resized || !host?.visible) {
+                        samples.push('missing');
+                        continue;
+                    }
+                    samples.push(host.has_style_class_name('basedock-window-indicator-overflow')
+                        ? 'bar' : windowDots(host).length);
+                }
+                check(`${side}: shrinking keeps the overflow bar once it appears`,
+                    samples[0] === 7 && samples.slice(1).every(sample => sample === 'bar'),
+                    `indicator at sizes 27, 26, 23 and 16: ${samples.join(', ')}`);
+            } finally {
+                dash.commitResize(0);
+            }
+        }
+    } finally {
+        settings().set_string('position', 'bottom');
+        for (const opened of windows)
+            opened.delete(global.get_current_time());
+        await waitFor(() => app.get_windows().length === 1, 5000);
+        await settle();
+    }
 }
 
 async function testTransientWindowIndicator(window) {
@@ -2641,6 +2690,7 @@ async function main() {
     // The dock at the left and the right edge, then back at the bottom.
     await testSides(window);
     await testWindowIndicator(window);
+    await testWindowIndicatorOverflow(window);
     await testTransientWindowIndicator(window);
     await testWindowCycle(window);
     await checkInterruptedDrag();

@@ -5,7 +5,7 @@ import Clutter from 'gi://Clutter';
 import type Meta from 'gi://Meta';
 import St from 'gi://St';
 
-import type {Geometry} from './geometry.js';
+import {type Geometry, windowDotCapacity} from './geometry.js';
 
 type WindowDot = {slot: St.Widget, dot: St.Widget};
 
@@ -59,10 +59,10 @@ export class WindowIndicator {
         this.#tracked = tracked;
         const windows = taskbarWindows(appWindows);
         const slotSize = g.dotSize;
-        const gap = Math.max(1, Math.round(g.dotSize / 2));
+        const gap = g.dotSpacing;
         const dotRowLength = windows.length * slotSize + (windows.length - 1) * gap;
-        const overflow = dotRowLength > size + g.footprint;
-        const length = overflow ? 3 * g.dotSize : Math.max(slotSize, dotRowLength);
+        const overflow = windows.length > windowDotCapacity(size);
+        const length = overflow ? 3 * slotSize : Math.max(slotSize, dotRowLength);
         const vertical = this.#vertical;
         this.#host.set_size((vertical ? slotSize : length) * scaleFactor,
             (vertical ? length : slotSize) * scaleFactor);
@@ -81,7 +81,7 @@ export class WindowIndicator {
         }
 
         this.#layout.spacing = gap * scaleFactor;
-        this.#minimizedScale = Math.max(1, Math.round(slotSize / 3)) / slotSize;
+        this.#minimizedScale = Math.min(slotSize / 2, Math.round(slotSize / 3) + 0.5) / slotSize;
         for (const [index, window] of shown.entries()) {
             let actors = this.#dots.get(window);
             if (!actors) {

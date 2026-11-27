@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {dockSizeAt, fitDock} from '../dist/geometry.js';
+import {
+    dockSizeAt, fitDock, geometryAt, MAX_ICON_SIZE, MIN_ICON_SIZE, windowDotCapacity,
+} from '../dist/geometry.js';
 
 const measurements = {
     alongBorder: 2,
@@ -52,4 +54,15 @@ test('the drop placeholder takes one app slot and its spacing', () => {
     assert.equal(dockSizeAt(withPlaceholder, 48).length, 490);
     assert.equal(fitDock(withoutPlaceholder).iconSize, 48);
     assert.ok(fitDock(withPlaceholder).iconSize < 48);
+});
+
+test('window marks fit and their capacity never increases as the dock shrinks', () => {
+    assert.equal(windowDotCapacity(48), 7);
+    for (let size = MIN_ICON_SIZE; size <= MAX_ICON_SIZE; size++) {
+        const {dotSize, dotSpacing, footprint} = geometryAt(size);
+        const count = windowDotCapacity(size);
+        assert.ok(count * dotSize + (count - 1) * dotSpacing <= size + footprint, `size ${size}`);
+        if (size > MIN_ICON_SIZE)
+            assert.ok(count >= windowDotCapacity(size - 1), `size ${size}`);
+    }
 });

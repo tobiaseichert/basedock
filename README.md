@@ -42,7 +42,8 @@ with the same command.
 Dividers separate Show Apps, favorites, other running apps and Trash. Running
 apps have a highlighted tile and one mark per window. The focused window has
 a white dot, other visible windows have gray dots, and minimized windows have
-gray lines. A bar takes over if the marks would exceed the tile. Click an app
+gray lines. A bar takes over when there are too many marks to show individually
+at that size. It stays a bar as you shrink the dock. Click an app
 icon to focus the app. Once it has focus, click its icon again to cycle through
 its visible windows in indicator order. To restore a specific minimized window,
 right-click the icon and choose the window under **Open Windows**. When

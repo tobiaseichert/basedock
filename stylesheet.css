@@ -32,8 +32,8 @@
  * divider after Show Apps is adjusted to center its line between the drawn
  * icons. The running indicator sits 4px from the tile toward the screen edge.
  * At the reference size, each window has a 5px slot. A minimized window
- * uses a 2px line along the dock in that slot. A 15px bar replaces the
- * indicators if the row exceeds the tile.
+ * uses a 2.5px-thick line along the dock in that slot. A 15px bar replaces
+ * the marks when there are too many to show individually.
  * The drag image reuses T, R and G.
  *
  * The normal palettes are translucent so the rounded blur in src/blur.ts
